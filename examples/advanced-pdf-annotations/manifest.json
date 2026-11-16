@@ -1,0 +1,17 @@
+{
+  "id": "advanced-pdf-annotations",
+  "name": "Advanced PDF Annotations",
+  "version": "1.0.0",
+  "apiVersion": 4,
+  "type": "declarative",
+  "description": "Manage native PDF annotations and comments in a searchable sidebar, and comment directly on a selection.",
+  "feature": "document.annotation_tools",
+  "permissions": [
+    "document.annotations.read",
+    "document.annotations.write",
+    "ui.context_menu",
+    "ui.panel",
+    "navigation.page",
+    "commands.register"
+  ]
+}

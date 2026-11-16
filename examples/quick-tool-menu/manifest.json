@@ -1,0 +1,18 @@
+{
+  "id": "quick-tool-menu",
+  "name": "Quick Tool Menu",
+  "version": "1.0.0",
+  "apiVersion": 4,
+  "type": "javascript",
+  "description": "Build a context-aware tool menu in JavaScript, with editable favorites and a menu size setting.",
+  "permissions": [
+    "scripts.execute",
+    "ui.popup",
+    "tools.select",
+    "commands.register"
+  ],
+  "settings": {
+    "favorites": "pen,highlighter,eraser,lasso,pan,markup",
+    "limit": "7"
+  }
+}

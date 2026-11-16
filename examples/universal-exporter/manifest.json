@@ -1,0 +1,16 @@
+{
+  "id": "universal-exporter",
+  "name": "Universal Exporter",
+  "version": "1.0.0",
+  "apiVersion": 4,
+  "type": "declarative",
+  "description": "Export PDF annotations and typed notes, with PDF++ callouts, custom templates and Sidemark bundles.",
+  "feature": "document.export",
+  "permissions": [
+    "document.annotations.read",
+    "document.text.read",
+    "document.metadata.read",
+    "storage.export",
+    "commands.register"
+  ]
+}
