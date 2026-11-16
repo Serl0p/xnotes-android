@@ -290,7 +290,7 @@ private val sharedRecents = androidx.compose.runtime.mutableStateOf<List<com.xno
 enum class Pane { PRIMARY, SECONDARY }
 
 @Stable
-class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, SelectionMenuHost, LongPressMenuHost, TextEditHost, SwatchStore, ColorDropHost, AudioHost, CropHost {
+class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, PenMenuHost, SelectionMenuHost, LongPressMenuHost, TextEditHost, SwatchStore, ColorDropHost, AudioHost, CropHost {
 
     private val appContext = context.applicationContext
 
@@ -717,6 +717,8 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, S
     /** Long-press paste context menu target, or null when hidden. */
     override var contextMenu by mutableStateOf<ContextMenuTarget?>(null)
         private set
+    override val penMenu = PenMenuState()
+    override val penMenuTool: Tool? get() = tool.takeIf { it.hasSettings }
     var title by mutableStateOf(state.document.title)
         private set
     var dirty by mutableStateOf(false)
@@ -770,6 +772,7 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, S
             it.onSay = { text -> say(text) }
             it.view.onTwoFingerTap = { dispatchTapGesture(preferences.twoFingerTap) }
             it.view.onThreeFingerTap = { dispatchTapGesture(preferences.threeFingerTap) }
+            bindHoverClicks(it.view, it.view.sideButton, it.penMenu) { canvasOpen }
         }
 
     /** Take on a swatch the canvas recoloured, so both bars show it and the next save keeps it. */
@@ -1642,6 +1645,7 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, S
         }
         view.onTwoFingerTap = { dispatchTapGesture(preferences.twoFingerTap) }
         view.onThreeFingerTap = { dispatchTapGesture(preferences.threeFingerTap) }
+        bindHoverClicks(view, view.sideButton, penMenu) { !canvasOpen }
         view.hover = { controller.onHover(it) }
         view.genericMotion = { controller.onGenericMotion(it) }
         view.drawOverlay = { renderer, _ -> controller.drawOverlay(renderer) }
@@ -2975,6 +2979,7 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, S
      * to its end, closes it to anything new, and only then builds its own editor.
      */
     fun retire() {
+        resetPluginInput()
         secondary?.retire()
         RetiredEditors.inProcess.add(background)
     }
@@ -6316,6 +6321,8 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, S
     }
 
     private fun replaceDocument(doc: Document) {
+        view.sideButton.reset()
+        penMenu.close()
         AudioRecording.stopFor(this) // closing the note places its recording
         AudioPlayback.closeFor(this)
         saveViewState() // remember the outgoing folder note's view before switching away
@@ -6354,15 +6361,58 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, S
 
 
     /** Run the action a two/three-finger tap or stylus double-tap is mapped to; "none" does nothing. */
-    private fun dispatchTapGesture(action: String) {
-        // A canvas on top must not edit the paged note underneath it.
-        if (com.xnotes.plugins.DeclarativePackages.isCommand(action)) {
+    private fun dispatchTapGesture(action: String, at: Pt? = null) {
+        if (action == "pen-menu:open") {
+            if (!noteOpen) return
+            val canvas = if (canvasOpen) infinite else null
+            val host: PenMenuHost = canvas ?: this
+            val surface: android.view.View = canvas?.view ?: view
+            val registry = canvas?.extensions?.commands ?: extensions.commands
+            declarativePlugins.executePenMenu(registry) {
+                if (host.penMenu.at != null || host.penMenuTool != null) {
+                    host.penMenu.toggle(at ?: Pt(surface.width / 2.0, surface.height / 2.0))
+                }
+            }
+        } else if (com.xnotes.plugins.DeclarativePackages.isCommand(action)) {
             runDeclarativeCommand(action)
         } else if (canvasOpen) infinite.dispatchTapGesture(action)
         else extensions.commands.execute(action)
     }
 
     internal val declarativePlugins by lazy { com.xnotes.plugins.DeclarativePluginManager.get(appContext) }
+
+    private fun bindHoverClicks(
+        surface: android.view.View, side: com.xnotes.canvas.SideButtonClicks,
+        menu: PenMenuState, isCurrent: () -> Boolean,
+    ) {
+        fun active(): Boolean = noteOpen && isCurrent() && surface.isAttachedToWindow &&
+            android.os.Build.MANUFACTURER.equals("samsung", ignoreCase = true) &&
+            declarativePlugins.featureEnabled("stylus.hover")
+        val sequence = com.xnotes.canvas.HoverClickSequence(
+            schedule = { task -> surface.postDelayed(task, 300L) },
+            cancel = { task -> surface.removeCallbacks(task) },
+            deliver = { action, at -> if (active()) dispatchTapGesture(action, at) },
+        )
+        side.clicking = { active() && (preferences.stylusButtonTap != "none" || preferences.stylusDoubleTap != "none") }
+        side.onClick = { at ->
+            if (active()) sequence.click(at, preferences.stylusButtonTap, preferences.stylusDoubleTap)
+        }
+        side.onContact = { sequence.reset() }
+        side.touchClosesMenu = { menu.takesTouch() }
+    }
+
+    internal fun cancelPluginClicks() {
+        view.sideButton.reset()
+        infiniteOrNull?.view?.sideButton?.reset()
+        secondary?.cancelPluginClicks()
+    }
+
+    internal fun resetPluginInput() {
+        cancelPluginClicks()
+        penMenu.close()
+        infiniteOrNull?.penMenu?.close()
+        secondary?.resetPluginInput()
+    }
 
     /** An explicit profile selection goes through the active surface's native command registry. */
     internal fun runDeclarativeCommand(id: String): Boolean {
@@ -9228,6 +9278,7 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, S
      *  [noteOpen] so the editor is removed from the stack. The document stays as an inert buffer. */
     fun goHome() {
         if (!noteOpen) return
+        resetPluginInput()
         // Closing the note places a recording still going, before the note is saved.
         AudioRecording.stopFor(this)
         infiniteOrNull?.let { AudioRecording.stopFor(it) }

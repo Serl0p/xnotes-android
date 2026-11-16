@@ -269,7 +269,10 @@ class EditorActivity : ComponentActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (!hasFocus) StylusButtonLatch.releaseKey() // a held pen key's key-up may not come back to this window
+        if (!hasFocus) {
+            StylusButtonLatch.releaseKey()
+            editor?.cancelPluginClicks()
+        }
         if (hasFocus && editor?.fullscreen == true) applyFullscreen(true) // re-hide transient bars after they swipe in
     }
 
@@ -1513,6 +1516,7 @@ private fun EditorPane(
                         com.xnotes.ui.CropOverlay(canvas)
                         com.xnotes.ui.TextStyleBar(canvas)
                         com.xnotes.ui.LongPressMenu(canvas, onInsertImageAt = { c -> actions.onInsertCanvasImage(editor, c) })
+                        com.xnotes.ui.PenMenu(canvas)
                         com.xnotes.ui.CanvasDebugOverlay(canvas)
                     }
                 }
@@ -1564,6 +1568,7 @@ private fun EditorPane(
                             com.xnotes.ui.ScreenshotMenu(editor, onShare = actions.onShareImage)
                             com.xnotes.ui.TextStyleBar(editor)
                             com.xnotes.ui.LongPressMenu(editor, onInsertImageAt = { c -> actions.onInsertImage(editor, c) })
+                            com.xnotes.ui.PenMenu(editor)
                             com.xnotes.ui.FlowEditMenu(editor)
                             com.xnotes.ui.PdfSelectionMenu(editor)
                             com.xnotes.ui.MarkupNotePeek(editor)

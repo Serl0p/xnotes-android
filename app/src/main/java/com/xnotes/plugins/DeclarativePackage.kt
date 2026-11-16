@@ -15,6 +15,7 @@ internal data class PenProfile(val id: String, val name: String, val tool: Tool,
 internal data class DeclarativePackage(
     val id: String, val name: String, val version: String, val description: String,
     val profiles: List<PenProfile>, val bytes: ByteArray,
+    val feature: String? = null,
 )
 
 /** API 1 accepts only two root JSON files. Nothing is extracted, evaluated or executed. */
@@ -58,23 +59,40 @@ internal object DeclarativePackages {
                 zip.closeEntry()
             }
         }
-        require(entries.keys == allowedFiles) { "Expected manifest.json and profiles.json" }
+        require("manifest.json" in entries) { "Expected manifest.json" }
         fun json(name: String) = JSONObject(entries.getValue(name).toString(Charsets.UTF_8))
         val manifest = json("manifest.json")
-        manifest.only("id", "name", "version", "description", "apiVersion", "type", "permissions")
+        manifest.only("id", "name", "version", "description", "apiVersion", "type", "permissions", "feature")
         val id = manifest.string("id", 64)
         require(idPattern.matches(id) && id != "core") { "Invalid plugin ID" }
         val name = manifest.string("name", 80)
         val version = manifest.string("version", 32)
         require(versionPattern.matches(version)) { "Expected a version such as 1.0.0" }
-        require(manifest.get("apiVersion") == 1 && manifest.get("type") == "declarative") {
-            "Unsupported plugin API or type"
+        require(manifest.get("type") == "declarative") { "Unsupported plugin type" }
+        val feature = if (manifest.has("feature")) manifest.string("feature", 64) else null
+        val required = when (feature) {
+            null -> {
+                require(manifest.get("apiVersion") == 1 && entries.keys == allowedFiles)
+                require(id !in setOf("advanced-stylus", "pen-menu")) { "Reserved feature ID" }
+                permissions
+            }
+            "stylus.hover" -> {
+                require(manifest.get("apiVersion") == 2 && id == "advanced-stylus" && entries.keys == setOf("manifest.json"))
+                setOf("input.stylus")
+            }
+            "ui.pen_menu" -> {
+                require(manifest.get("apiVersion") == 2 && id == "pen-menu" && entries.keys == setOf("manifest.json"))
+                setOf("ui.pen_menu", "commands.register")
+            }
+            else -> error("Unsupported native feature")
         }
         val declared = manifest.getJSONArray("permissions")
-        require(declared.length() == permissions.size &&
-            (0 until declared.length()).map { declared.get(it) }.toSet() == permissions) {
+        require(declared.length() == required.size &&
+            (0 until declared.length()).map { declared.get(it) }.toSet() == required) {
             "Unsupported or missing permissions"
         }
+        if (feature != null) return DeclarativePackage(id, name, version,
+            manifest.string("description", 300), emptyList(), bytes.copyOf(), feature)
         val root = json("profiles.json")
         root.only("profiles")
         val array = root.getJSONArray("profiles")

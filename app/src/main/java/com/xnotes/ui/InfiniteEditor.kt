@@ -83,7 +83,7 @@ import com.xnotes.ui.theme.Palette
 /** How near ink a finger tap during playback may land to play from it, in dp. */
 private const val INK_TAP_DP = 8.0
 
-class InfiniteEditor(context: Context) : ToolPopupHost, SelectionMenuHost, LongPressMenuHost, TextEditHost, ColorDropHost, AudioHost, CropHost {
+class InfiniteEditor(context: Context) : ToolPopupHost, PenMenuHost, SelectionMenuHost, LongPressMenuHost, TextEditHost, ColorDropHost, AudioHost, CropHost {
 
     private val appContext = context.applicationContext
 
@@ -620,6 +620,9 @@ class InfiniteEditor(context: Context) : ToolPopupHost, SelectionMenuHost, LongP
 
     /** Where a held finger opened the paste menu, or null when no menu is open. */
     override var contextMenu: ContextMenuTarget? by mutableStateOf(null)
+
+    override val penMenu = PenMenuState()
+    override val penMenuTool: Tool? get() = tool.takeIf { it.hasSettings && it != Tool.MARKUP }
 
     override val clipboardHasImage: Boolean
         get() = com.xnotes.platform.SystemClipboard.hasImage(appContext)
@@ -2229,6 +2232,8 @@ class InfiniteEditor(context: Context) : ToolPopupHost, SelectionMenuHost, LongP
     // --- documents ---
 
     fun replaceDocument(next: InfiniteDocument) {
+        view.sideButton.reset()
+        penMenu.close()
         AudioRecording.stopFor(this) // closing the canvas places its recording
         AudioPlayback.closeFor(this)
         clearFading() // whatever was melting belongs to the outgoing canvas

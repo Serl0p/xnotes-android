@@ -95,6 +95,10 @@ internal fun CommunityPlugins(editor: Editor) {
             Switch(checked = entry.enabled, onCheckedChange = { enabled -> change { manager.setEnabled(pkg.id, enabled) } })
         }
         if (entry.enabled && !manager.safeMode) {
+            when (pkg.feature) {
+                "stylus.hover" -> Text("Samsung hover clicks enabled. Set Stylus side button (tap) and Stylus double-tap in Input. With both mapped, a single click waits 300 ms.", fontSize = 12.sp)
+                "ui.pen_menu" -> Text("Assign Pen Menu: Open tool settings to any tap gesture in Input. Select a pen first.", fontSize = 12.sp)
+            }
             for (profile in pkg.profiles) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
@@ -119,9 +123,15 @@ internal fun CommunityPlugins(editor: Editor) {
                     Text("${pkg.id} · ${pkg.version}")
                     existing?.let { Text("Installed version: ${it.pkg.version}. Confirm replacement, even for the same version or a downgrade.") }
                     Text(pkg.description)
-                    Text("Requested permissions:\n• Configure pen tools\n• Register profile commands")
-                    Text("No executable code. Applying a profile replaces that native tool's current configuration for future strokes.")
-                    Text("Profiles: " + pkg.profiles.joinToString { it.name })
+                    when (pkg.feature) {
+                        "stylus.hover" -> Text("Requested permission: Recognize nearby stylus button gestures. No executable code.")
+                        "ui.pen_menu" -> Text("Requested permissions: Open native tool settings and register a command. No executable code.")
+                        else -> {
+                            Text("Requested permissions:\n• Configure pen tools\n• Register profile commands")
+                            Text("No executable code. Applying a profile replaces that native tool's current configuration for future strokes.")
+                            Text("Profiles: " + pkg.profiles.joinToString { it.name })
+                        }
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = enableOnInstall, onCheckedChange = { enableOnInstall = it })
                         Text("Enable after installation")

@@ -63,6 +63,8 @@ class InfiniteCanvasView @JvmOverloads constructor(
     /** Stylus side-button presses on the generic-motion stream, for pens that omit them from touch. */
     var genericMotion: ((MotionEvent) -> Unit)? = null
 
+    val sideButton = com.xnotes.canvas.SideButtonClicks()
+
     /** Hardware keys arriving while this view holds focus. */
     var onKey: ((KeyEvent) -> Boolean)? = null
 
@@ -259,6 +261,7 @@ class InfiniteCanvasView @JvmOverloads constructor(
 
     @Suppress("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (sideButton.onTouch(event)) return true
         if (trackFourFingerTap(event)) return true
         if (trackMultiFingerTap(event)) return true
         return input?.invoke(event) ?: super.onTouchEvent(event)
@@ -351,10 +354,13 @@ class InfiniteCanvasView @JvmOverloads constructor(
         cancel.recycle()
     }
 
-    override fun onHoverEvent(event: MotionEvent): Boolean =
-        hover?.invoke(event) ?: super.onHoverEvent(event)
+    override fun onHoverEvent(event: MotionEvent): Boolean {
+        sideButton.onMotion(event)
+        return hover?.invoke(event) ?: super.onHoverEvent(event)
+    }
 
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {
+        sideButton.onMotion(event)
         genericMotion?.invoke(event)
         return super.onGenericMotionEvent(event)
     }

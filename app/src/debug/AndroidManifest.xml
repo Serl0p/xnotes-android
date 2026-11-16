@@ -1,3 +1,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
-    <application android:label="xNotes Dev" tools:replace="android:label" />
+    <application android:label="@string/app_name" android:icon="@drawable/ic_dev_launcher" tools:replace="android:label,android:icon">
+        <activity-alias android:name=".MainActivity" android:targetActivity=".EditorActivity" android:label="@string/app_name" android:icon="@drawable/ic_dev_launcher" tools:replace="android:icon" />
+        <activity-alias android:name=".IconCreamRose" android:targetActivity=".EditorActivity" android:label="@string/app_name" android:icon="@drawable/ic_dev_launcher" tools:replace="android:icon" />
+        <activity-alias android:name=".IconInkTile" android:targetActivity=".EditorActivity" android:label="@string/app_name" android:icon="@drawable/ic_dev_launcher" tools:replace="android:icon" />
+        <activity-alias android:name=".IconGraphite" android:targetActivity=".EditorActivity" android:label="@string/app_name" android:icon="@drawable/ic_dev_launcher" tools:replace="android:icon" />
+        <activity-alias android:name=".IconSumi" android:targetActivity=".EditorActivity" android:label="@string/app_name" android:icon="@drawable/ic_dev_launcher" tools:replace="android:icon" />
+        <activity-alias android:name=".IconPow" android:targetActivity=".EditorActivity" android:label="@string/app_name" android:icon="@drawable/ic_dev_launcher" tools:replace="android:icon" />
+        <activity-alias android:name=".IconMarbling" android:targetActivity=".EditorActivity" android:label="@string/app_name" android:icon="@drawable/ic_dev_launcher" tools:replace="android:icon" />
+        <activity-alias android:name=".IconClassic" android:targetActivity=".EditorActivity" android:label="@string/app_name" android:icon="@drawable/ic_dev_launcher" tools:replace="android:icon" />
+        <activity-alias android:name=".IconLime" android:targetActivity=".EditorActivity" android:label="@string/app_name" android:icon="@drawable/ic_dev_launcher" tools:replace="android:icon" />
+        <activity-alias android:name=".IconAqua" android:targetActivity=".EditorActivity" android:label="@string/app_name" android:icon="@drawable/ic_dev_launcher" tools:replace="android:icon" />
+        <activity-alias android:name=".IconCreamTile" android:targetActivity=".EditorActivity" android:label="@string/app_name" android:icon="@drawable/ic_dev_launcher" tools:replace="android:icon" />
+    </application>
 </manifest>
