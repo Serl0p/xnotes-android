@@ -1460,6 +1460,11 @@ private fun EditorPane(
             }
         }
     }
+    // Plugin chrome is a reversible overlay on native preferences, scoped to this pane.
+    val chrome = com.xnotes.ui.rememberPluginChrome(editor)
+    val nativeLook = com.xnotes.ui.LocalToolbarLook.current
+    CompositionLocalProvider(com.xnotes.ui.LocalPluginChrome provides chrome,
+        com.xnotes.ui.LocalToolbarLook provides (chrome?.spec?.style?.apply(nativeLook) ?: nativeLook)) {
     // The colour a swatch drag carries rides over the whole pane, toolbar and page alike.
     Box(modifier) {
         Column(
@@ -1591,6 +1596,7 @@ private fun EditorPane(
         com.xnotes.ui.ColorDropOverlay(if (editor.canvasOpen) editor.infinite else editor)
         com.xnotes.ui.PluginExportDialog(editor)
         com.xnotes.ui.PluginSelectionCommentDialog(editor)
+    }
     }
 }
 

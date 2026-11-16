@@ -28,6 +28,7 @@ import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
@@ -102,7 +103,7 @@ internal fun ColumnScope.ToolbarAround(
         }
         return
     }
-    val depth = barMetrics(look.size).thickness + FLOAT_MARGIN
+    val depth = barMetrics(look.size).thickness * (LocalPluginChrome.current?.rows?.size ?: 1) + FLOAT_MARGIN
     val px = with(LocalDensity.current) { depth.toPx().toDouble() }
     val position = look.position
     SideEffect {
@@ -139,15 +140,25 @@ internal fun ToolbarFrame(
     val bar = barMetrics(look.size).copy(vertical = look.position.vertical)
     val glide = remember { ToolGlide() }
     val palette = LocalPalette.current
-    val shape = MaterialTheme.shapes.extraLarge
+    val style = LocalPluginChrome.current?.spec?.style
+    val shape = style?.radius?.let { androidx.compose.foundation.shape.RoundedCornerShape(it.dp) } ?: MaterialTheme.shapes.extraLarge
+    val panel = palette.panel.toComposeColor()
+    // Keep native text/icon contrast. Incompatible theme colors fall back to current panel.
+    val proposed = style?.background?.let { runCatching { androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(it)) }.getOrNull() }
+    fun contrast(a: androidx.compose.ui.graphics.Color, b: androidx.compose.ui.graphics.Color): Float {
+        val x = a.luminance(); val y = b.luminance()
+        return (maxOf(x,y) + 0.05f) / (minOf(x,y) + 0.05f)
+    }
+    val background = proposed?.takeIf { contrast(it, palette.textDim.toComposeColor()) >= 3f && contrast(it,palette.text.toComposeColor()) >= 4.5f } ?: panel
+    val spacing = (style?.spacing ?: 0).dp
     // Docked, the strip fills its edge; floating, a pill only as long as its tools, up to that edge.
     val surface = if (!look.floating) {
-        Modifier.background(palette.panel.toComposeColor())
+        Modifier.background(background)
     } else {
         Modifier
             .shadow(6.dp, shape)
             .clip(shape)
-            .background(palette.panel.toComposeColor())
+            .background(background)
             .border(1.dp, palette.border.toComposeColor(), shape)
     }
     val stretch = when {
@@ -176,6 +187,7 @@ internal fun ToolbarFrame(
                         .verticalScroll(rememberScrollState())
                         .padding(vertical = 4.dp)
                         .toolGlide(glide, armed),
+                    verticalArrangement = Arrangement.spacedBy(spacing),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) { content() }
                 trailing?.invoke()
@@ -191,6 +203,7 @@ internal fun ToolbarFrame(
                         .horizontalScroll(rememberScrollState())
                         .padding(horizontal = 4.dp)
                         .toolGlide(glide, armed),
+                    horizontalArrangement = Arrangement.spacedBy(spacing),
                     verticalAlignment = Alignment.CenterVertically,
                 ) { content() }
                 trailing?.invoke()

@@ -60,7 +60,7 @@ internal fun CommunityPlugins(editor: Editor) {
                         val input = requireNotNull(context.contentResolver.openInputStream(uri)) { "Cannot open file" }
                         input.use { DeclarativePackages.parse(DeclarativePackages.readLimited(it)) }
                     }
-                    enableOnInstall = if (pkg.script != null) false else manager.installed.firstOrNull { it.pkg.id == pkg.id }?.enabled ?: true
+                    enableOnInstall = if (pkg.script != null || pkg.toolbar != null) false else manager.installed.firstOrNull { it.pkg.id == pkg.id }?.enabled ?: true
                     pending = pkg
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) {
@@ -95,8 +95,15 @@ internal fun CommunityPlugins(editor: Editor) {
             Switch(checked = entry.enabled, onCheckedChange = { enabled -> change { manager.setEnabled(pkg.id, enabled) } })
         }
         if (entry.enabled && !manager.safeMode) {
-            if (pkg.script != null) {
-                Text("JavaScript · Assign its command in Input or open from View.", fontSize = 12.sp)
+            if (pkg.toolbar != null) {
+                val chosen = manager.toolbarProvider() === pkg
+                Text(if (chosen) "Active toolbar provider" else "Available toolbar provider", fontSize = 12.sp)
+                TextButton(onClick = { change { manager.useToolbar(if (chosen) null else pkg) } }) {
+                    Text(if (chosen) "Restore native toolbar" else "Use this toolbar")
+                }
+            }
+            if (pkg.script != null || pkg.toolbar != null) {
+                if (pkg.script != null) Text("JavaScript · Assign its command in Input or open from View.", fontSize = 12.sp)
                 for ((key, value) in manager.scriptSettings(pkg)) {
                     var draft by remember(pkg, key, value) { mutableStateOf(value) }
                     androidx.compose.material3.OutlinedTextField(value = draft, onValueChange = { draft = it.take(160) },
@@ -139,7 +146,10 @@ internal fun CommunityPlugins(editor: Editor) {
                     Text("${pkg.id} · ${pkg.version}")
                     existing?.let { Text("Installed version: ${it.pkg.version}. Confirm replacement, even for the same version or a downgrade.") }
                     Text(pkg.description)
-                    if (pkg.script != null) {
+                    if (pkg.toolbar != null) {
+                        Text(if (pkg.toolbarScript) "Executable isolated JavaScript may generate a toolbar from editor type and plugin settings." else "Declarative toolbar configuration; no executable code.")
+                        Text("Permission: customize toolbar layout, native controls and style. No document, file or network access. Explicitly select the toolbar after enabling. Safe mode restores native controls.")
+                    } else if (pkg.script != null) {
                         Text("Executable JavaScript. Permissions: isolated script execution, open a native popup, select drawing tools on your tap, register a command. No note content, filesystem or network bridge. Scripts are disabled by default.")
                     } else when (pkg.feature) {
                         "stylus.hover" -> Text("Requested permission: Recognize nearby stylus button gestures. No executable code.")

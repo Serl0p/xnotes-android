@@ -48,13 +48,17 @@ internal object ScriptMenuRuntime {
         return ScriptMenu(title, items, layout)
     }
 
-    suspend fun run(context: Context, request: ScriptMenuRequest): ScriptMenu = withContext(Dispatchers.IO) {
+    suspend fun run(context: Context, request: ScriptMenuRequest): ScriptMenu {
+        val input = JSONObject().put("activeTool", request.activeTool)
+            .put("surface", if (request.canvas) "infinite" else "paged")
+            .put("tools", JSONArray(request.tools)).put("settings", JSONObject(request.settings)).toString()
+        return parseResult(evaluate(context, requireNotNull(request.pkg.script), input), request.tools)
+    }
+
+    /** Shared bounded evaluator; toolbar and menu calls cannot run concurrently. */
+    suspend fun evaluate(context: Context, source: String, input: String): String = withContext(Dispatchers.IO) {
         synchronized(lock) {
             check(JavaScriptSandbox.isSupported()) { "Android JavaScript sandbox unavailable; update Android System WebView" }
-            val input = JSONObject().put("activeTool", request.activeTool)
-                .put("surface", if (request.canvas) "infinite" else "paged")
-                .put("tools", JSONArray(request.tools)).put("settings", JSONObject(request.settings)).toString()
-            val source = requireNotNull(request.pkg.script)
             val connection = JavaScriptSandbox.createConnectedInstanceAsync(context.applicationContext)
             val sandbox = try { connection.get(4, TimeUnit.SECONDS) } catch (e: Exception) {
                 connection.addListener({ runCatching { connection.get().close() } }, Executor { it.run() })
@@ -73,7 +77,8 @@ internal object ScriptMenuRuntime {
                 try {
                     val code = "JSON.stringify((function(context) { 'use strict';\n" + source + "\n})(" + input + "))"
                     val result = isolate.evaluateJavaScriptAsync(code).get(2, TimeUnit.SECONDS)
-                    parseResult(result, request.tools)
+                    require(result.length <= MAX_RETURN) { "Script result too large" }
+                    result
                 } finally { isolate.close() }
             } finally { sandbox.close() }
         }

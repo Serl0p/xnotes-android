@@ -18,6 +18,8 @@ internal data class DeclarativePackage(
     val feature: String? = null,
     val script: String? = null,
     val scriptDefaults: Map<String, String> = emptyMap(),
+    val toolbar: String? = null,
+    val toolbarScript: Boolean = false,
 )
 
 /** API 1 accepts only two root JSON files. Nothing is extracted, evaluated or executed. */
@@ -28,7 +30,7 @@ internal object DeclarativePackages {
     private val commandPattern = Regex("[a-z][a-z0-9_.-]{0,63}")
     private val versionPattern = Regex("[0-9]{1,9}\\.[0-9]{1,9}\\.[0-9]{1,9}")
     private val permissions = setOf("tools.configure", "commands.register")
-    private val allowedFiles = setOf("manifest.json", "profiles.json", "main.js")
+    private val allowedFiles = setOf("manifest.json", "profiles.json", "main.js", "toolbar.json")
     private val profilesFiles = setOf("manifest.json", "profiles.json")
 
     fun readLimited(input: InputStream, limit: Int = MAX_ARCHIVE): ByteArray {
@@ -71,6 +73,23 @@ internal object DeclarativePackages {
         val name = manifest.string("name", 80)
         val version = manifest.string("version", 32)
         require(versionPattern.matches(version)) { "Expected a version such as 1.0.0" }
+        if (manifest.get("type") in setOf("toolbar", "toolbar-javascript")) {
+            val scripted = manifest.get("type") == "toolbar-javascript"
+            val required = if (scripted) setOf("scripts.execute", "ui.toolbar", "ui.controls") else setOf("ui.toolbar", "ui.controls")
+            require(manifest.get("apiVersion") == if (scripted) 7 else 6)
+            require(!manifest.has("feature") && NativeFeature.entries.none { it.owner == id })
+            val file = if (scripted) "main.js" else "toolbar.json"
+            require(entries.keys == setOf("manifest.json", file)) { "Unexpected toolbar package entries" }
+            val declared = manifest.getJSONArray("permissions")
+            require(declared.length() == required.size &&
+                (0 until declared.length()).map { declared.get(it) }.toSet() == required) { "Unsupported toolbar permissions" }
+            val source = entries.getValue(file).toString(Charsets.UTF_8)
+            require(source.isNotBlank() && source.length <= 32768) { "Invalid toolbar source size" }
+            val defaults = readSettings(manifest)
+            if (!scripted) ToolbarSpecs.parse(source, false, true).also { ToolbarSpecs.parse(source, true, false) }
+            return DeclarativePackage(id, name, version, manifest.string("description", 300), emptyList(),
+                bytes.copyOf(), scriptDefaults = defaults, toolbar = source, toolbarScript = scripted)
+        }
         if (manifest.get("type") == "javascript") {
             require(manifest.get("apiVersion") in setOf(4, 5) && entries.keys == setOf("manifest.json", "main.js") &&
                 !manifest.has("feature") && NativeFeature.entries.none { it.owner == id }) { "Incompatible script package" }
@@ -81,17 +100,7 @@ internal object DeclarativePackages {
             }
             val source = entries.getValue("main.js").toString(Charsets.UTF_8)
             require(source.isNotBlank() && source.length <= 32768) { "Invalid script size" }
-            val defaults = linkedMapOf<String, String>()
-            if (manifest.has("settings")) {
-                val settings = manifest.getJSONObject("settings")
-                require(settings.length() <= 8) { "Too many settings" }
-                for (key in settings.keys()) {
-                    require(commandPattern.matches(key)) { "Invalid setting key" }
-                    val value = settings.get(key)
-                    require(value is String && value.length <= 160 && value.none { it.isISOControl() }) { "Invalid setting" }
-                    defaults[key] = value
-                }
-            }
+            val defaults = readSettings(manifest)
             return DeclarativePackage(id, name, version, manifest.string("description", 300),
                 emptyList(), bytes.copyOf(), script = source, scriptDefaults = defaults)
         }
@@ -121,6 +130,21 @@ internal object DeclarativePackages {
         val profiles = (0 until array.length()).map { profile(array.getJSONObject(it)) }
         require(profiles.map { it.id }.toSet().size == profiles.size) { "Duplicate profile IDs" }
         return DeclarativePackage(id, name, version, manifest.string("description", 300), profiles, bytes.copyOf())
+    }
+
+    private fun readSettings(manifest: JSONObject): Map<String, String> {
+        val defaults = linkedMapOf<String, String>()
+        if (manifest.has("settings")) {
+            val settings = manifest.getJSONObject("settings")
+            require(settings.length() <= 8) { "Too many settings" }
+            for (key in settings.keys()) {
+                require(commandPattern.matches(key)) { "Invalid setting key" }
+                val value = settings.get(key)
+                require(value is String && value.length <= 160 && value.none { it.isISOControl() }) { "Invalid setting" }
+                defaults[key] = value
+            }
+        }
+        return defaults
     }
 
     private fun profile(o: JSONObject): PenProfile {

@@ -53,6 +53,7 @@ internal class DeclarativePluginManager private constructor(context: Context) {
         save(installed.map { if (it.pkg.id == id) it.copy(enabled = enabled) else it })
 
     fun uninstall(id: String) {
+        if (selectedToolbar == id) useToolbar(null)
         save(installed.filterNot { it.pkg.id == id })
         val edit = prefs.edit()
         for (key in prefs.all.keys.filter { it.startsWith("setting:$id:") }) edit.remove(key)
@@ -88,6 +89,19 @@ internal class DeclarativePluginManager private constructor(context: Context) {
         check(prefs.edit().putLong("setting:advanced-stylus:click-ms", click)
             .putLong("setting:advanced-stylus:double-ms", double).commit()) { "Cannot save stylus timing" }
         settingsRevision++
+    }
+
+    private var selectedToolbar by mutableStateOf(prefs.getString("toolbar-provider", null))
+
+    fun toolbarProvider(): DeclarativePackage? =
+        if (safeMode) null else installed.firstOrNull { it.enabled && it.pkg.id == selectedToolbar && it.pkg.toolbar != null }?.pkg
+
+    fun useToolbar(pkg: DeclarativePackage?) {
+        require(pkg == null || installed.any { it.enabled && it.pkg === pkg && pkg.toolbar != null })
+        val edit = prefs.edit()
+        if (pkg == null) edit.remove("toolbar-provider") else edit.putString("toolbar-provider", pkg.id)
+        check(edit.commit()) { "Could not save toolbar choice" }
+        selectedToolbar = pkg?.id
     }
 
     fun scriptFor(command: String): DeclarativePackage? =

@@ -124,15 +124,11 @@ fun Toolbar(
     var switcherIndex by remember { mutableStateOf<Int?>(null) }
     var renaming by remember { mutableStateOf(false) }
     // Pinned outside the scrolling strip so closing a split pane is always one tap away.
-    ToolbarFrame(armed = editor.tool, trailing = onClosePane?.let { { ClosePaneButton(it) } }) {
-        // The bar is driven by the user-customisable layout; separators sit between non-empty
-        // sections, and each item dispatches to its renderer (see ToolbarItemView).
-        editor.toolbarLayout.visibleSections.forEachIndexed { si, section ->
-            if (si > 0) Separator()
-            section.visibleEntries.forEach { entry ->
+    PluginToolbarFrames(armed = editor.tool, host = editor, native = editor.toolbarLayout, select = editor::selectTool,
+        trailing = onClosePane?.let { { ClosePaneButton(it) } }, item = { item ->
                 ToolbarItemView(
                     editor = editor,
-                    item = entry.item,
+                    item = item,
                     toolIcons = toolIcons,
                     configForTool = configForTool,
                     setConfigForTool = { configForTool = it },
@@ -148,9 +144,8 @@ fun Toolbar(
                     onRecordAudio = onRecordAudio,
                     onTakePhoto = onTakePhoto,
                 )
-            }
         }
-    }
+    )
 
     if (renaming) {
         val renameFailed = stringResource(R.string.err_rename_note)

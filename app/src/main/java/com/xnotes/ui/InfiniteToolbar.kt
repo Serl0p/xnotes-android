@@ -82,12 +82,9 @@ fun InfiniteToolbar(
     var switcherIndex by remember { mutableStateOf<Int?>(null) }
 
     // Pinned outside the scrolling strip so closing a split pane is always one tap away.
-    ToolbarFrame(armed = editor.tool, trailing = onClosePane?.let { { ClosePaneButton(it) } }) {
-        val sections = editor.toolbarLayout.visibleSections
-        sections.forEachIndexed { index, section ->
-            if (index > 0) Separator()
-            for (entry in section.visibleEntries) {
-                when (val item = entry.item) {
+    PluginToolbarFrames(armed = editor.tool, host = editor, native = editor.toolbarLayout, select = editor::armTool,
+        trailing = onClosePane?.let { { ClosePaneButton(it) } }, item = { item ->
+                when (item) {
                     ToolbarItem.HOME -> ToolbarIcon(XnotesIcons.prev, stringResource(R.string.toolbar_home)) { onOpenBackstage() }
                     // A name has no room down a side rail.
                     ToolbarItem.TITLE -> if (!LocalBar.current.vertical) Label(if (editor.document.displayName == null && editor.document.path == null) stringResource(R.string.untitled) else editor.title, Modifier.padding(end = 4.dp))
@@ -195,9 +192,7 @@ fun InfiniteToolbar(
                     // Everything else belongs to the paged bar; a canvas layout never holds one.
                     else -> Unit
                 }
-            }
-        }
-
+        }, tail = {
         if (!LocalBar.current.vertical) editor.renderFailure?.let {
             Separator()
             Label(stringResource(R.string.gl_unavailable))
@@ -207,5 +202,5 @@ fun InfiniteToolbar(
             Label(stringResource(R.string.canvas_out_of_memory))
         }
         Spacer(Modifier.padding(horizontal = 2.dp))
-    }
+    })
 }
