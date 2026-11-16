@@ -63,19 +63,25 @@ internal class DeclarativePluginManager private constructor(context: Context) {
     fun activeCommands(): List<Pair<String, String>> =
         if (safeMode) emptyList() else installed.filter { it.enabled }.flatMap { entry ->
             entry.pkg.profiles.map { "${entry.pkg.id}:${it.id}" to "${entry.pkg.name}: ${it.name}" } +
-                (if (entry.pkg.feature == "ui.pen_menu") listOf("pen-menu:open" to "Pen Menu: Open tool settings") else emptyList())
+                (NativeFeature.find(entry.pkg.feature)?.let { native ->
+                    native.command?.let { listOf(it to native.label) }
+                } ?: emptyList())
         }
 
     fun featureEnabled(feature: String): Boolean =
         !safeMode && installed.any { it.enabled && it.pkg.feature == feature }
 
-    fun executePenMenu(registry: CommandRegistry, action: () -> Unit): Boolean {
-        if (!featureEnabled("ui.pen_menu")) return false
-        val grant = ExtensionGrant("pen-menu", setOf(ExtensionPermission.EXECUTE_COMMAND))
-        val id = registry.registerExtension(grant, "open", action)
+    fun executeNative(feature: NativeFeature, registry: CommandRegistry, action: () -> Unit): Boolean {
+        val local = feature.localCommand ?: return false
+        if (!featureEnabled(feature.key)) return false
+        val grant = ExtensionGrant(feature.owner, setOf(ExtensionPermission.EXECUTE_COMMAND))
+        val id = registry.registerExtension(grant, local, action)
         return try { registry.executeForExtension(grant, id) }
-        finally { registry.unregisterExtension("pen-menu") }
+        finally { registry.unregisterExtension(feature.owner) }
     }
+
+    fun executePenMenu(registry: CommandRegistry, action: () -> Unit): Boolean =
+        executeNative(NativeFeature.PEN_MENU, registry, action)
 
     fun execute(id: String, registry: CommandRegistry, apply: (PenProfile) -> Unit): Boolean {
         if (safeMode || !DeclarativePackages.isCommand(id)) return false

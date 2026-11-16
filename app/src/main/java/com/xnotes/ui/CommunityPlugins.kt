@@ -71,7 +71,7 @@ internal fun CommunityPlugins(editor: Editor) {
         }
     }
 
-    Text("Import declarative .xplugin packages. Installed plugins cannot read or edit notes, use the network, or execute scripts.", fontSize = 12.sp)
+    Text("Import declarative .xplugin packages. Document export plugins read only the active note on request. No scripts, network access or direct document editing.", fontSize = 12.sp)
     TextButton(enabled = !busy, onClick = { picker.launch(arrayOf("*/*")) }) {
         Text(if (busy) "Validating…" else "Import plugin (.xplugin)")
     }
@@ -98,6 +98,8 @@ internal fun CommunityPlugins(editor: Editor) {
             when (pkg.feature) {
                 "stylus.hover" -> Text("Samsung hover clicks enabled. Set Stylus side button (tap) and Stylus double-tap in Input. With both mapped, a single click waits 300 ms.", fontSize = 12.sp)
                 "ui.pen_menu" -> Text("Assign Pen Menu: Open tool settings to any tap gesture in Input. Select a pen first.", fontSize = 12.sp)
+                "document.annotations" -> Text("Open a paged note, then View > Annotation Exporter.", fontSize = 12.sp)
+                "document.obsidian" -> Text("Open a paged note, then View > Obsidian Companion.", fontSize = 12.sp)
             }
             for (profile in pkg.profiles) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -126,6 +128,10 @@ internal fun CommunityPlugins(editor: Editor) {
                     when (pkg.feature) {
                         "stylus.hover" -> Text("Requested permission: Recognize nearby stylus button gestures. No executable code.")
                         "ui.pen_menu" -> Text("Requested permissions: Open native tool settings and register a command. No executable code.")
+                        "document.annotations", "document.obsidian" -> {
+                            val native = com.xnotes.plugins.NativeFeature.find(pkg.feature)
+                            Text("Requested permissions: " + (native?.explanation ?: "") + " Register a command. No scripts or background access.")
+                        }
                         else -> {
                             Text("Requested permissions:\n• Configure pen tools\n• Register profile commands")
                             Text("No executable code. Applying a profile replaces that native tool's current configuration for future strokes.")

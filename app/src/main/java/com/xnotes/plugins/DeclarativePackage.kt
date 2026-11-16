@@ -70,21 +70,15 @@ internal object DeclarativePackages {
         require(versionPattern.matches(version)) { "Expected a version such as 1.0.0" }
         require(manifest.get("type") == "declarative") { "Unsupported plugin type" }
         val feature = if (manifest.has("feature")) manifest.string("feature", 64) else null
-        val required = when (feature) {
-            null -> {
-                require(manifest.get("apiVersion") == 1 && entries.keys == allowedFiles)
-                require(id !in setOf("advanced-stylus", "pen-menu")) { "Reserved feature ID" }
-                permissions
-            }
-            "stylus.hover" -> {
-                require(manifest.get("apiVersion") == 2 && id == "advanced-stylus" && entries.keys == setOf("manifest.json"))
-                setOf("input.stylus")
-            }
-            "ui.pen_menu" -> {
-                require(manifest.get("apiVersion") == 2 && id == "pen-menu" && entries.keys == setOf("manifest.json"))
-                setOf("ui.pen_menu", "commands.register")
-            }
-            else -> error("Unsupported native feature")
+        val required = if (feature == null) {
+            require(manifest.get("apiVersion") == 1 && entries.keys == allowedFiles)
+            require(NativeFeature.entries.none { it.owner == id }) { "Reserved feature ID" }
+            permissions
+        } else {
+            val native = requireNotNull(NativeFeature.find(feature)) { "Unsupported native feature" }
+            require(manifest.get("apiVersion") == native.api && id == native.owner &&
+                entries.keys == setOf("manifest.json")) { "Incompatible feature package" }
+            native.permissions
         }
         val declared = manifest.getJSONArray("permissions")
         require(declared.length() == required.size &&

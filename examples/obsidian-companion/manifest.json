@@ -1,0 +1,16 @@
+{
+  "id": "obsidian-companion",
+  "name": "Obsidian Companion",
+  "version": "1.0.0",
+  "apiVersion": 3,
+  "type": "declarative",
+  "description": "Generate a Markdown companion with a relative xNotes link, typed text and PDF annotations.",
+  "feature": "document.obsidian",
+  "permissions": [
+    "document.annotations.read",
+    "document.text.read",
+    "document.metadata.read",
+    "storage.export",
+    "commands.register"
+  ]
+}

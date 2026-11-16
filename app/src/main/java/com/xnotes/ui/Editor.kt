@@ -6321,6 +6321,7 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
     }
 
     private fun replaceDocument(doc: Document) {
+        dismissPluginExport()
         view.sideButton.reset()
         penMenu.close()
         AudioRecording.stopFor(this) // closing the note places its recording
@@ -6373,6 +6374,8 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
                     host.penMenu.toggle(at ?: Pt(surface.width / 2.0, surface.height / 2.0))
                 }
             }
+        } else if (com.xnotes.plugins.ExportKind.entries.any { it.command == action }) {
+            requestPluginExport(com.xnotes.plugins.ExportKind.entries.first { it.command == action })
         } else if (com.xnotes.plugins.DeclarativePackages.isCommand(action)) {
             runDeclarativeCommand(action)
         } else if (canvasOpen) infinite.dispatchTapGesture(action)
@@ -6380,6 +6383,19 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
     }
 
     internal val declarativePlugins by lazy { com.xnotes.plugins.DeclarativePluginManager.get(appContext) }
+
+    internal var pluginExportRequest by mutableStateOf<Pair<com.xnotes.plugins.ExportKind, com.xnotes.plugins.ExportDocument>?>(null)
+        private set
+    internal fun dismissPluginExport() { pluginExportRequest = null }
+
+    internal fun requestPluginExport(kind: com.xnotes.plugins.ExportKind) {
+        if (!noteOpen || canvasOpen || !declarativePlugins.featureEnabled(kind.feature)) return
+        declarativePlugins.executeNative(kind.native, extensions.commands) {
+            runCatching { com.xnotes.plugins.DocumentReadApi.snapshot(state.document, kind.native) }
+                .onSuccess { pluginExportRequest = kind to it }
+                .onFailure { say(it.message ?: "Cannot prepare note export") }
+        }
+    }
 
     private fun bindHoverClicks(
         surface: android.view.View, side: com.xnotes.canvas.SideButtonClicks,
@@ -9278,6 +9294,7 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
      *  [noteOpen] so the editor is removed from the stack. The document stays as an inert buffer. */
     fun goHome() {
         if (!noteOpen) return
+        dismissPluginExport()
         resetPluginInput()
         // Closing the note places a recording still going, before the note is saved.
         AudioRecording.stopFor(this)

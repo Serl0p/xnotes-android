@@ -1,0 +1,14 @@
+{
+  "id": "annotation-exporter",
+  "name": "Annotation Exporter",
+  "version": "1.0.0",
+  "apiVersion": 3,
+  "type": "declarative",
+  "description": "Export native PDF text annotations and comments as Markdown, plain text, JSON or CSV.",
+  "feature": "document.annotations",
+  "permissions": [
+    "document.annotations.read",
+    "storage.export",
+    "commands.register"
+  ]
+}
