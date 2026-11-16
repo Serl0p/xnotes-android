@@ -6485,6 +6485,17 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
         if (canvasOpen) infinite.armTool(next) else selectTool(next)
     }
 
+    /** Explicit UI action only: no color/mutation bridge is exposed to JavaScript. */
+    internal fun applyScriptInk(request: com.xnotes.plugins.ScriptMenuRequest, color: Rgba, swatch: Int? = null) {
+        if (scriptMenuRequest !== request || !noteOpen || canvasOpen != request.canvas ||
+            !request.pkg.paletteAccess || !declarativePlugins.scriptActive(request.pkg)) return
+        val host: ToolPopupHost = if (canvasOpen) infinite else this
+        val index = swatch ?: host.hostActiveColorIndex
+        if (index !in host.hostToolbarColors.indices) return
+        host.setSwatchColor(index, color.copy(a = 255))
+        host.rememberSwatchColor(index)
+    }
+
     internal var pluginExportRequest by mutableStateOf<Pair<com.xnotes.plugins.ExportKind, com.xnotes.plugins.ExportDocument>?>(null)
         private set
     internal fun dismissPluginExport() { pluginExportRequest = null }

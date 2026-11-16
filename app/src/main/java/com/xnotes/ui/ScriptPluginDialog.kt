@@ -62,6 +62,14 @@ internal fun ScriptPluginDialog(editor: Editor) {
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { error = "Script stopped or rejected. " + (e.message ?: "Unknown error").take(240) }
     }
+    val rich = menu
+    if (error == null && rich != null && rich.layout == "radial" && rich.center != "close") {
+        val host: ToolPopupHost = if (editor.canvasOpen) editor.infinite else editor
+        PluginPaletteOverlay(request, rich, host, editor::dismissScriptMenu,
+            { id -> editor.chooseScriptTool(request,id) },
+            { color, index -> editor.applyScriptInk(request,color,index) })
+        return
+    }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val result = menu
         if (error == null && (result == null || (result.layout == "radial" && maxWidth >= 234.dp && maxHeight >= 234.dp))) {
@@ -131,7 +139,7 @@ internal fun ScriptPluginDialog(editor: Editor) {
 }
 
 @Composable
-private fun ScriptToolIcon(item: ScriptMenuItem, selected: Boolean) {
+internal fun ScriptToolIcon(item: ScriptMenuItem, selected: Boolean) {
     val palette = LocalPalette.current
     val tint = if (selected) palette.accent.toComposeColor() else palette.text.toComposeColor()
     val stroke = when (item.tool) {

@@ -258,7 +258,7 @@ private const val SQUARE_FRAC = 0.94f // inset of the SV square inside the ring'
  * changes saturation/value.
  */
 @Composable
-private fun SpectrumWheel(
+internal fun SpectrumWheel(
     hue: Double,
     sat: Double,
     value: Double,

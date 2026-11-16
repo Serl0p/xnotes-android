@@ -64,12 +64,25 @@ internal class DeclarativePluginManager private constructor(context: Context) {
     private var settingsRevision by mutableStateOf(0)
     fun scriptSettings(pkg: DeclarativePackage): Map<String, String> {
         @Suppress("UNUSED_VARIABLE") val observe = settingsRevision
-        return pkg.scriptDefaults.mapValues { (key, default) -> prefs.getString("setting:${pkg.id}:$key", default) ?: default }
+        return pkg.scriptDefaults.mapValues { (key, default) ->
+            val stored = prefs.getString("setting:${pkg.id}:$key", default) ?: default
+            if (pkg.settingsUi[key]?.valid(stored) == false) default else stored
+        }
     }
     fun writeScriptSetting(pkg: DeclarativePackage, key: String, value: String) {
         require(installed.any { it.pkg === pkg } && key in pkg.scriptDefaults &&
             value.length <= 160 && value.none { it.isISOControl() }) { "Invalid plugin setting" }
-        check(prefs.edit().putString("setting:${pkg.id}:$key", value).commit()) { "Cannot save setting" }
+        writeScriptSettings(pkg, mapOf(key to value))
+    }
+
+    /** Atomically commit a visual form, not one save per slider tick or drag. */
+    fun writeScriptSettings(pkg: DeclarativePackage, values: Map<String,String>) {
+        require(installed.any { it.pkg === pkg } && values.keys.all { it in pkg.scriptDefaults })
+        require(values.all { (key,value) -> value.length <= 160 && value.none { it.isISOControl() } &&
+            pkg.settingsUi[key]?.valid(value) != false }) { "Invalid plugin setting" }
+        val edit = prefs.edit()
+        values.forEach { (key,value) -> edit.putString("setting:${pkg.id}:$key",value) }
+        check(edit.commit()) { "Cannot save settings" }
         settingsRevision++
     }
 

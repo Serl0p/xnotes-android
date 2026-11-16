@@ -20,6 +20,8 @@ internal data class DeclarativePackage(
     val scriptDefaults: Map<String, String> = emptyMap(),
     val toolbar: String? = null,
     val toolbarScript: Boolean = false,
+    val settingsUi: Map<String, PluginSettingsSchema.Field> = emptyMap(),
+    val paletteAccess: Boolean = false,
 )
 
 /** API 1 accepts only two root JSON files. Nothing is extracted, evaluated or executed. */
@@ -67,16 +69,18 @@ internal object DeclarativePackages {
         require("manifest.json" in entries) { "Expected manifest.json" }
         fun json(name: String) = JSONObject(entries.getValue(name).toString(Charsets.UTF_8))
         val manifest = json("manifest.json")
-        manifest.only("id", "name", "version", "description", "apiVersion", "type", "permissions", "feature", "settings")
+        manifest.only("id", "name", "version", "description", "apiVersion", "type", "permissions", "feature", "settings", "settingsUi")
         val id = manifest.string("id", 64)
         require(idPattern.matches(id) && id != "core") { "Invalid plugin ID" }
         val name = manifest.string("name", 80)
         val version = manifest.string("version", 32)
         require(versionPattern.matches(version)) { "Expected a version such as 1.0.0" }
+        val api = manifest.get("apiVersion")
+        require(!manifest.has("settingsUi") || (api == 8 && manifest.get("type") in setOf("javascript","toolbar","toolbar-javascript"))) { "Visual settings require API 8" }
         if (manifest.get("type") in setOf("toolbar", "toolbar-javascript")) {
             val scripted = manifest.get("type") == "toolbar-javascript"
             val required = if (scripted) setOf("scripts.execute", "ui.toolbar", "ui.controls") else setOf("ui.toolbar", "ui.controls")
-            require(manifest.get("apiVersion") == (if (scripted) 7 else 6)) { "Unsupported toolbar API" }
+            require(api in setOf(if (scripted) 7 else 6, 8)) { "Unsupported toolbar API" }
             require(!manifest.has("feature") && NativeFeature.entries.none { it.owner == id })
             val file = if (scripted) "main.js" else "toolbar.json"
             require(entries.keys == setOf("manifest.json", file)) { "Unexpected toolbar package entries" }
@@ -92,21 +96,26 @@ internal object DeclarativePackages {
                 ToolbarSpecs.parse(source, true, false)
             }
             return DeclarativePackage(id, name, version, manifest.string("description", 300), emptyList(),
-                bytes.copyOf(), scriptDefaults = defaults, toolbar = source, toolbarScript = scripted)
+                bytes.copyOf(), scriptDefaults = defaults, toolbar = source, toolbarScript = scripted,
+                settingsUi = PluginSettingsSchema.read(manifest, defaults))
         }
         if (manifest.get("type") == "javascript") {
-            require(manifest.get("apiVersion") in setOf(4, 5) && entries.keys == setOf("manifest.json", "main.js") &&
+            require(api in setOf(4, 5, 8) && entries.keys == setOf("manifest.json", "main.js") &&
                 !manifest.has("feature") && NativeFeature.entries.none { it.owner == id }) { "Incompatible script package" }
             val declared = manifest.getJSONArray("permissions")
-            val required = setOf("scripts.execute", "ui.popup", "tools.select", "commands.register")
-            require(declared.length() == required.size && (0 until declared.length()).map { declared.get(it) }.toSet() == required) {
+            val baseline = setOf("scripts.execute", "ui.popup", "tools.select", "commands.register")
+            val granted = (0 until declared.length()).map { declared.get(it) }.toSet()
+            val palette = api == 8 && granted == baseline + "tools.color"
+            val required = if (palette) baseline + "tools.color" else baseline
+            require(declared.length() == required.size && granted == required) {
                 "Unsupported script permissions"
             }
             val source = entries.getValue("main.js").toString(Charsets.UTF_8)
             require(source.isNotBlank() && source.length <= 32768) { "Invalid script size" }
             val defaults = readSettings(manifest)
             return DeclarativePackage(id, name, version, manifest.string("description", 300),
-                emptyList(), bytes.copyOf(), script = source, scriptDefaults = defaults)
+                emptyList(), bytes.copyOf(), script = source, scriptDefaults = defaults,
+                settingsUi = PluginSettingsSchema.read(manifest, defaults), paletteAccess = palette)
         }
         require(manifest.get("type") == "declarative" && !manifest.has("settings")) { "Unsupported plugin type" }
         val feature = if (manifest.has("feature")) manifest.string("feature", 64) else null

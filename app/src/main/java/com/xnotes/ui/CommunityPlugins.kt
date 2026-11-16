@@ -104,7 +104,11 @@ internal fun CommunityPlugins(editor: Editor) {
             }
             if (pkg.script != null || pkg.toolbar != null) {
                 if (pkg.script != null) Text("JavaScript · Assign its command in Input or open from View.", fontSize = 12.sp)
-                for ((key, value) in manager.scriptSettings(pkg)) {
+                if (pkg.settingsUi.isNotEmpty()) {
+                    PluginVisualSettings(pkg, manager.scriptSettings(pkg)) { values ->
+                        change { manager.writeScriptSettings(pkg, values) }
+                    }
+                } else for ((key, value) in manager.scriptSettings(pkg)) {
                     var draft by remember(pkg, key, value) { mutableStateOf(value) }
                     androidx.compose.material3.OutlinedTextField(value = draft, onValueChange = { draft = it.take(160) },
                         singleLine = true, label = { Text(key) }, modifier = Modifier.fillMaxWidth())
@@ -151,6 +155,7 @@ internal fun CommunityPlugins(editor: Editor) {
                         Text("Permission: customize toolbar layout, native controls and style. No document, file or network access. Explicitly select the toolbar after enabling. Safe mode restores native controls.")
                     } else if (pkg.script != null) {
                         Text("Executable JavaScript. Permissions: isolated script execution, open a native popup, select drawing tools on your tap, register a command. No note content, filesystem or network bridge. Scripts are disabled by default.")
+                        if (pkg.paletteAccess) Text("Additional permission: change active ink or select an existing swatch only when you explicitly use the native palette. This may update your normal swatch settings.")
                     } else when (pkg.feature) {
                         "stylus.hover" -> Text("Requested permission: Recognize nearby stylus button gestures. No executable code.")
                         "ui.pen_menu" -> Text("Requested permissions: Open native tool settings and register a command. No executable code.")

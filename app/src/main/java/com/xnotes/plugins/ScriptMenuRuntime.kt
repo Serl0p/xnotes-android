@@ -11,7 +11,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 internal data class ScriptMenuItem(val label: String, val tool: String)
-internal data class ScriptMenu(val title: String, val items: List<ScriptMenuItem>, val layout: String = "list")
+internal data class ScriptMenu(val title: String, val items: List<ScriptMenuItem>, val layout: String = "list",
+    val center: String = "close", val size: String = "regular", val colors: List<String> = emptyList())
 internal data class ScriptMenuRequest(
     val pkg: DeclarativePackage, val activeTool: String, val canvas: Boolean,
     val settings: Map<String, String>, val tools: List<String>,
@@ -24,10 +25,10 @@ internal object ScriptMenuRuntime {
     private val lock = Any()
     const val MAX_RETURN = 16 * 1024
 
-    fun parseResult(raw: String, tools: Collection<String>): ScriptMenu {
+    fun parseResult(raw: String, tools: Collection<String>, paletteAccess: Boolean = false): ScriptMenu {
         require(raw.length <= MAX_RETURN) { "Script result too large" }
         val obj = JSONObject(raw)
-        require(obj.keys().asSequence().all { it in setOf("title", "items", "layout") }) { "Unsupported menu field" }
+        require(obj.keys().asSequence().all { it in setOf("title", "items", "layout", "center", "size", "colors") }) { "Unsupported menu field" }
         fun label(value: Any?, max: Int): String {
             require(value is String && value.isNotBlank() && value.length <= max && value.none { it.isISOControl() }) { "Invalid menu label" }
             return value
@@ -44,15 +45,29 @@ internal object ScriptMenuRuntime {
         }
         val layout = if (obj.has("layout")) obj.get("layout") else "list"
         require(layout is String && layout in setOf("list", "radial")) { "Unsupported menu layout" }
-        require(layout != "radial" || items.size <= 8) { "Radial menus accept at most 8 entries" }
-        return ScriptMenu(title, items, layout)
+        val center = if (obj.has("center")) obj.get("center") else "close"
+        require(center is String && center in setOf("close","palette","swatches"))
+        require(center == "close" || (paletteAccess && layout == "radial")) { "Palette permission required" }
+        val size = if (obj.has("size")) obj.get("size") else "regular"
+        require(size is String && size in setOf("compact","regular","large"))
+        val colors = if (obj.has("colors")) {
+            require(paletteAccess && center != "close")
+            val a = obj.getJSONArray("colors")
+            require(a.length() <= 6)
+            (0 until a.length()).map { i ->
+                val c = a.get(i); require(c is String && Regex("#[0-9a-fA-F]{6}").matches(c)); c
+            }.distinct()
+        } else emptyList()
+        require(layout != "radial" || items.size <= if (center == "close") 8 else 10) { "Too many radial entries" }
+        require(items.map { it.tool }.distinct().size == items.size) { "Duplicate tools" }
+        return ScriptMenu(title, items, layout, center, size, colors)
     }
 
     suspend fun run(context: Context, request: ScriptMenuRequest): ScriptMenu {
         val input = JSONObject().put("activeTool", request.activeTool)
             .put("surface", if (request.canvas) "infinite" else "paged")
             .put("tools", JSONArray(request.tools)).put("settings", JSONObject(request.settings)).toString()
-        return parseResult(evaluate(context, requireNotNull(request.pkg.script), input), request.tools)
+        return parseResult(evaluate(context, requireNotNull(request.pkg.script), input), request.tools, request.pkg.paletteAccess)
     }
 
     /** Shared bounded evaluator; toolbar and menu calls cannot run concurrently. */
