@@ -1588,6 +1588,7 @@ private fun EditorPane(
         }
         com.xnotes.ui.ColorDropOverlay(if (editor.canvasOpen) editor.infinite else editor)
         com.xnotes.ui.PluginExportDialog(editor)
+        com.xnotes.ui.ScriptPluginDialog(editor)
     }
 }
 

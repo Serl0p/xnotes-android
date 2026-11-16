@@ -16,6 +16,8 @@ internal data class DeclarativePackage(
     val id: String, val name: String, val version: String, val description: String,
     val profiles: List<PenProfile>, val bytes: ByteArray,
     val feature: String? = null,
+    val script: String? = null,
+    val scriptDefaults: Map<String, String> = emptyMap(),
 )
 
 /** API 1 accepts only two root JSON files. Nothing is extracted, evaluated or executed. */
@@ -26,7 +28,8 @@ internal object DeclarativePackages {
     private val commandPattern = Regex("[a-z][a-z0-9_.-]{0,63}")
     private val versionPattern = Regex("[0-9]{1,9}\\.[0-9]{1,9}\\.[0-9]{1,9}")
     private val permissions = setOf("tools.configure", "commands.register")
-    private val allowedFiles = setOf("manifest.json", "profiles.json")
+    private val allowedFiles = setOf("manifest.json", "profiles.json", "main.js")
+    private val profilesFiles = setOf("manifest.json", "profiles.json")
 
     fun readLimited(input: InputStream, limit: Int = MAX_ARCHIVE): ByteArray {
         val out = ByteArrayOutputStream()
@@ -62,16 +65,40 @@ internal object DeclarativePackages {
         require("manifest.json" in entries) { "Expected manifest.json" }
         fun json(name: String) = JSONObject(entries.getValue(name).toString(Charsets.UTF_8))
         val manifest = json("manifest.json")
-        manifest.only("id", "name", "version", "description", "apiVersion", "type", "permissions", "feature")
+        manifest.only("id", "name", "version", "description", "apiVersion", "type", "permissions", "feature", "settings")
         val id = manifest.string("id", 64)
         require(idPattern.matches(id) && id != "core") { "Invalid plugin ID" }
         val name = manifest.string("name", 80)
         val version = manifest.string("version", 32)
         require(versionPattern.matches(version)) { "Expected a version such as 1.0.0" }
-        require(manifest.get("type") == "declarative") { "Unsupported plugin type" }
+        if (manifest.get("type") == "javascript") {
+            require(manifest.get("apiVersion") == 4 && entries.keys == setOf("manifest.json", "main.js") &&
+                !manifest.has("feature") && NativeFeature.entries.none { it.owner == id }) { "Incompatible script package" }
+            val declared = manifest.getJSONArray("permissions")
+            val required = setOf("scripts.execute", "ui.popup", "tools.select", "commands.register")
+            require(declared.length() == required.size && (0 until declared.length()).map { declared.get(it) }.toSet() == required) {
+                "Unsupported script permissions"
+            }
+            val source = entries.getValue("main.js").toString(Charsets.UTF_8)
+            require(source.isNotBlank() && source.length <= 32768) { "Invalid script size" }
+            val defaults = linkedMapOf<String, String>()
+            if (manifest.has("settings")) {
+                val settings = manifest.getJSONObject("settings")
+                require(settings.length() <= 8) { "Too many settings" }
+                for (key in settings.keys()) {
+                    require(commandPattern.matches(key)) { "Invalid setting key" }
+                    val value = settings.get(key)
+                    require(value is String && value.length <= 160 && value.none { it.isISOControl() }) { "Invalid setting" }
+                    defaults[key] = value
+                }
+            }
+            return DeclarativePackage(id, name, version, manifest.string("description", 300),
+                emptyList(), bytes.copyOf(), script = source, scriptDefaults = defaults)
+        }
+        require(manifest.get("type") == "declarative" && !manifest.has("settings")) { "Unsupported plugin type" }
         val feature = if (manifest.has("feature")) manifest.string("feature", 64) else null
         val required = if (feature == null) {
-            require(manifest.get("apiVersion") == 1 && entries.keys == allowedFiles)
+            require(manifest.get("apiVersion") == 1 && entries.keys == profilesFiles)
             require(NativeFeature.entries.none { it.owner == id }) { "Reserved feature ID" }
             permissions
         } else {

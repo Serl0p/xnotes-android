@@ -52,7 +52,40 @@ internal class DeclarativePluginManager private constructor(context: Context) {
     fun setEnabled(id: String, enabled: Boolean) =
         save(installed.map { if (it.pkg.id == id) it.copy(enabled = enabled) else it })
 
-    fun uninstall(id: String) = save(installed.filterNot { it.pkg.id == id })
+    fun uninstall(id: String) {
+        save(installed.filterNot { it.pkg.id == id })
+        val edit = prefs.edit()
+        for (key in prefs.all.keys.filter { it.startsWith("setting:$id:") }) edit.remove(key)
+        edit.apply()
+        settingsRevision++
+    }
+
+    private var settingsRevision by mutableStateOf(0)
+    fun scriptSettings(pkg: DeclarativePackage): Map<String, String> {
+        @Suppress("UNUSED_VARIABLE") val observe = settingsRevision
+        return pkg.scriptDefaults.mapValues { (key, default) -> prefs.getString("setting:${pkg.id}:$key", default) ?: default }
+    }
+    fun writeScriptSetting(pkg: DeclarativePackage, key: String, value: String) {
+        require(installed.any { it.pkg === pkg } && key in pkg.scriptDefaults &&
+            value.length <= 160 && value.none { it.isISOControl() }) { "Invalid plugin setting" }
+        check(prefs.edit().putString("setting:${pkg.id}:$key", value).commit()) { "Cannot save setting" }
+        settingsRevision++
+    }
+
+    fun scriptFor(command: String): DeclarativePackage? =
+        if (safeMode) null else installed.firstOrNull {
+            it.enabled && it.pkg.script != null && command == "${it.pkg.id}:open"
+        }?.pkg
+
+    fun scriptActive(pkg: DeclarativePackage): Boolean = scriptFor("${pkg.id}:open") === pkg
+
+    fun executeScript(pkg: DeclarativePackage, registry: CommandRegistry, action: () -> Unit): Boolean {
+        if (!scriptActive(pkg)) return false
+        val grant = ExtensionGrant(pkg.id, setOf(ExtensionPermission.EXECUTE_COMMAND))
+        val id = registry.registerExtension(grant, "open", action)
+        return try { registry.executeForExtension(grant, id) }
+        finally { registry.unregisterExtension(pkg.id) }
+    }
 
     fun updateSafeMode(value: Boolean) {
         check(prefs.edit().putBoolean("safe_mode", value).commit()) { "Could not save safe mode" }
@@ -65,7 +98,8 @@ internal class DeclarativePluginManager private constructor(context: Context) {
             entry.pkg.profiles.map { "${entry.pkg.id}:${it.id}" to "${entry.pkg.name}: ${it.name}" } +
                 (NativeFeature.find(entry.pkg.feature)?.let { native ->
                     native.command?.let { listOf(it to native.label) }
-                } ?: emptyList())
+                } ?: emptyList()) +
+                (if (entry.pkg.script != null) listOf("${entry.pkg.id}:open" to entry.pkg.name) else emptyList())
         }
 
     fun featureEnabled(feature: String): Boolean =

@@ -828,6 +828,7 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
         // matching how a note opened from outside the root behaves.
         canvasAutosaveUri = if (uri != null && browseRoot?.let { isUnderTree(uri, it) } == true) uri else null
         canvasAutosaveUri?.let { rememberStamp(it) }
+        dismissScriptMenu()
         canvasOpen = true
         noteOpen = true
         canvas.recoverRecordings(fromSession)
@@ -6321,6 +6322,7 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
     }
 
     private fun replaceDocument(doc: Document) {
+        dismissScriptMenu()
         dismissPluginExport()
         view.sideButton.reset()
         penMenu.close()
@@ -6363,7 +6365,10 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
 
     /** Run the action a two/three-finger tap or stylus double-tap is mapped to; "none" does nothing. */
     private fun dispatchTapGesture(action: String, at: Pt? = null) {
-        if (action == "pen-menu:open") {
+        val script = declarativePlugins.scriptFor(action)
+        if (script != null) {
+            requestScriptMenu(script)
+        } else if (action == "pen-menu:open") {
             if (!noteOpen) return
             val canvas = if (canvasOpen) infinite else null
             val host: PenMenuHost = canvas ?: this
@@ -6383,6 +6388,32 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
     }
 
     internal val declarativePlugins by lazy { com.xnotes.plugins.DeclarativePluginManager.get(appContext) }
+
+    internal fun runPluginUiCommand(id: String) { dispatchTapGesture(id) }
+
+    internal var scriptMenuRequest by mutableStateOf<com.xnotes.plugins.ScriptMenuRequest?>(null)
+        private set
+    internal fun dismissScriptMenu() { scriptMenuRequest = null }
+
+    private fun requestScriptMenu(pkg: com.xnotes.plugins.DeclarativePackage) {
+        if (!noteOpen || scriptMenuRequest != null) return
+        val canvas = if (canvasOpen) infinite else null
+        val allowed = listOf(Tool.PEN, Tool.DASHED, Tool.CALLIGRAPHY, Tool.SPEED, Tool.TAPER,
+            Tool.HIGHLIGHTER, Tool.ERASER, Tool.PAN, Tool.SELECT, Tool.LASSO, Tool.SHAPE) +
+            (if (canvas == null && hasPdf) listOf(Tool.MARKUP) else emptyList())
+        declarativePlugins.executeScript(pkg, canvas?.extensions?.commands ?: extensions.commands) {
+            scriptMenuRequest = com.xnotes.plugins.ScriptMenuRequest(pkg, (canvas?.tool ?: tool).id,
+                canvasOpen, declarativePlugins.scriptSettings(pkg), allowed.map { it.id })
+        }
+    }
+
+    internal fun chooseScriptTool(request: com.xnotes.plugins.ScriptMenuRequest, id: String) {
+        if (scriptMenuRequest !== request || !noteOpen || canvasOpen != request.canvas ||
+            !declarativePlugins.scriptActive(request.pkg) || id !in request.tools) return
+        val next = Tool.fromId(id) ?: return
+        dismissScriptMenu()
+        if (canvasOpen) infinite.armTool(next) else selectTool(next)
+    }
 
     internal var pluginExportRequest by mutableStateOf<Pair<com.xnotes.plugins.ExportKind, com.xnotes.plugins.ExportDocument>?>(null)
         private set
@@ -9294,6 +9325,7 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
      *  [noteOpen] so the editor is removed from the stack. The document stays as an inert buffer. */
     fun goHome() {
         if (!noteOpen) return
+        dismissScriptMenu()
         dismissPluginExport()
         resetPluginInput()
         // Closing the note places a recording still going, before the note is saved.

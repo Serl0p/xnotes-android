@@ -1,5 +1,7 @@
 package com.xnotes.ui
 
+import com.xnotes.plugins.contributions
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -737,10 +739,8 @@ fun ViewMenuPopup(editor: Editor, onDismiss: () -> Unit) {
             ToggleRow(stringResource(R.string.caption_keep_images), vs.keepImages) { setKeepImages(it) }
         } else Column(Modifier.width(250.dp).padding(horizontal = 14.dp, vertical = 8.dp)) {
             PopupTitle(stringResource(R.string.title_view))
-            for (kind in com.xnotes.plugins.ExportKind.entries) {
-                if (editor.declarativePlugins.featureEnabled(kind.feature)) {
-                    DropdownMenuItem(text = { Text(kind.label) }, onClick = { onDismiss(); editor.requestPluginExport(kind) })
-                }
+            for (action in editor.declarativePlugins.contributions(com.xnotes.plugins.PluginSlot.VIEW_MENU)) {
+                DropdownMenuItem(text = { Text(action.label) }, onClick = { onDismiss(); editor.runPluginUiCommand(action.id) })
             }
             StyleCaption(stringResource(R.string.caption_viewing_mode))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
