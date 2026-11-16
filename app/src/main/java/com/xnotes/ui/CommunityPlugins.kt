@@ -105,7 +105,10 @@ internal fun CommunityPlugins(editor: Editor) {
                 }
             }
             when (pkg.feature) {
-                "stylus.hover" -> Text("Samsung hover clicks enabled. Set Stylus side button (tap) and Stylus double-tap in Input. With both mapped, a single click waits 300 ms.", fontSize = 12.sp)
+                "stylus.hover" -> {
+                    Text("Set actions in Preferences > Input. Timing applies to Samsung hover clicks only.", fontSize = 12.sp)
+                    StylusTimingSettings(manager) { click, double -> change { manager.updateStylusTimings(click, double) } }
+                }
                 "ui.pen_menu" -> Text("Assign Pen Menu: Open tool settings to any tap gesture in Input. Select a pen first.", fontSize = 12.sp)
                 "document.annotations" -> Text("Open a paged note, then View > Annotation Exporter.", fontSize = 12.sp)
                 "document.obsidian" -> Text("Open a paged note, then View > Obsidian Companion.", fontSize = 12.sp)

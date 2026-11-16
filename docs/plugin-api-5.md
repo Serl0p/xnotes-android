@@ -1,0 +1,4 @@
+# Experimental API 5
+API 1–4 packages remain readable. JavaScript menus optionally return layout: "radial" (one to eight tools). The host uses viewport coordinates from the stylus gesture and clamps to edges, with a list fallback in small panes. Default layout remains list for API 4 compatibility. UI stays native: JS does not obtain Android views or touch events. Tap a tool, the center X, outside, or use Back. Non-positioned commands open around the viewport center.
+Samsung hover timing is configurable from Plugins > Advanced Stylus Controls. Maximum click duration 100–1000 ms, double-click interval 150–800 ms. Defaults system long-press and 300 ms. Native pen contact and native key routes retain original behavior. Timing is stored per installed plugin and the previous API 2 package also works.
+Home sidebar now has Preferences, Plugins, optional Trash, About. Plugin manager moved; application ID and signing unchanged.

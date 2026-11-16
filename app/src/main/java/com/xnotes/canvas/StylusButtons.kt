@@ -114,11 +114,13 @@ class ButtonClick(private val timeoutMs: () -> Long) {
     private var pressedAt = NONE
     private var touched = false
     private var touching = false
+    private var pressTimeout = 0L
 
-    /** The button went down at [at] (uptime ms). */
-    fun onPress(at: Long) {
+    /** Freeze the timing at press time. Native key route uses the original system default. */
+    fun onPress(at: Long, overrideTimeoutMs: Long? = null) {
         pressedAt = at
         touched = touching
+        pressTimeout = overrideTimeoutMs ?: timeoutMs()
     }
 
     /** The button came up at [at]; true when the press was a click. */
@@ -134,7 +136,7 @@ class ButtonClick(private val timeoutMs: () -> Long) {
     }
 
     /** Whether the press in progress may still turn out a click at [at], so a hold must not act on it yet. */
-    fun mayStillClick(at: Long): Boolean = pressedAt != NONE && !touched && at - pressedAt < timeoutMs()
+    fun mayStillClick(at: Long): Boolean = pressedAt != NONE && !touched && at - pressedAt < pressTimeout
 
     /** Follow the pen tip on and off the screen, from every touch the window gets. */
     fun onTouch(e: MotionEvent) = onTouch(e.actionMasked, e.getToolType(e.actionIndex))

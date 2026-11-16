@@ -21,6 +21,9 @@ class SideButtonClicks(private val clicks: ButtonClick = StylusButtonLatch.click
     /** Whether a click runs anything; while not, presses are not reported, as on the key route. */
     var clicking: () -> Boolean = { false }
 
+    /** Optional hover-only click duration; the native key route remains unchanged. */
+    var clickTimeoutMs: () -> Long? = { null }
+
     /**
      * A touch is starting on the page. True when a menu that leaves the page live took it (the pen
      * menu, which it closes): the whole touch is then the menu's, so it draws nothing.
@@ -76,7 +79,7 @@ class SideButtonClicks(private val clicks: ButtonClick = StylusButtonLatch.click
         held = down
         if (down) {
             if (clicking()) {
-                clicks.onPress(time)
+                clicks.onPress(time, clickTimeoutMs())
                 pressedAt = pen
             }
             return null

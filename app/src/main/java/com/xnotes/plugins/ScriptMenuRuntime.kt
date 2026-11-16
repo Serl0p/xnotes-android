@@ -11,10 +11,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 internal data class ScriptMenuItem(val label: String, val tool: String)
-internal data class ScriptMenu(val title: String, val items: List<ScriptMenuItem>)
+internal data class ScriptMenu(val title: String, val items: List<ScriptMenuItem>, val layout: String = "list")
 internal data class ScriptMenuRequest(
     val pkg: DeclarativePackage, val activeTool: String, val canvas: Boolean,
     val settings: Map<String, String>, val tools: List<String>,
+    val anchor: com.xnotes.core.geometry.Pt,
 )
 
 /** A fresh isolated process per invocation. Only JSON data crosses the boundary.
@@ -26,7 +27,7 @@ internal object ScriptMenuRuntime {
     fun parseResult(raw: String, tools: Collection<String>): ScriptMenu {
         require(raw.length <= MAX_RETURN) { "Script result too large" }
         val obj = JSONObject(raw)
-        require(obj.keys().asSequence().all { it in setOf("title", "items") }) { "Unsupported menu field" }
+        require(obj.keys().asSequence().all { it in setOf("title", "items", "layout") }) { "Unsupported menu field" }
         fun label(value: Any?, max: Int): String {
             require(value is String && value.isNotBlank() && value.length <= max && value.none { it.isISOControl() }) { "Invalid menu label" }
             return value
@@ -41,7 +42,10 @@ internal object ScriptMenuRuntime {
             require(tool is String && tool in tools) { "Unsupported tool action" }
             ScriptMenuItem(label(item.get("label"), 60), tool)
         }
-        return ScriptMenu(title, items)
+        val layout = if (obj.has("layout")) obj.get("layout") else "list"
+        require(layout is String && layout in setOf("list", "radial")) { "Unsupported menu layout" }
+        require(layout != "radial" || items.size <= 8) { "Radial menus accept at most 8 entries" }
+        return ScriptMenu(title, items, layout)
     }
 
     suspend fun run(context: Context, request: ScriptMenuRequest): ScriptMenu = withContext(Dispatchers.IO) {

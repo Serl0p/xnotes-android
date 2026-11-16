@@ -72,7 +72,7 @@ internal object DeclarativePackages {
         val version = manifest.string("version", 32)
         require(versionPattern.matches(version)) { "Expected a version such as 1.0.0" }
         if (manifest.get("type") == "javascript") {
-            require(manifest.get("apiVersion") == 4 && entries.keys == setOf("manifest.json", "main.js") &&
+            require(manifest.get("apiVersion") in setOf(4, 5) && entries.keys == setOf("manifest.json", "main.js") &&
                 !manifest.has("feature") && NativeFeature.entries.none { it.owner == id }) { "Incompatible script package" }
             val declared = manifest.getJSONArray("permissions")
             val required = setOf("scripts.execute", "ui.popup", "tools.select", "commands.register")
@@ -103,7 +103,7 @@ internal object DeclarativePackages {
             permissions
         } else {
             val native = requireNotNull(NativeFeature.find(feature)) { "Unsupported native feature" }
-            require(manifest.get("apiVersion") == native.api && id == native.owner &&
+            require((manifest.get("apiVersion") == native.api || (native == NativeFeature.STYLUS && manifest.get("apiVersion") == 5)) && id == native.owner &&
                 entries.keys == setOf("manifest.json")) { "Incompatible feature package" }
             native.permissions
         }

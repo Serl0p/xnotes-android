@@ -72,6 +72,24 @@ internal class DeclarativePluginManager private constructor(context: Context) {
         settingsRevision++
     }
 
+    fun stylusClickMs(): Long {
+        @Suppress("UNUSED_VARIABLE") val observe = settingsRevision
+        val default = android.view.ViewConfiguration.getLongPressTimeout().toLong().coerceIn(100L, 1000L)
+        return prefs.getLong("setting:advanced-stylus:click-ms", default).coerceIn(100L, 1000L)
+    }
+
+    fun stylusDoubleMs(): Long {
+        @Suppress("UNUSED_VARIABLE") val observe = settingsRevision
+        return prefs.getLong("setting:advanced-stylus:double-ms", 300L).coerceIn(150L, 800L)
+    }
+
+    fun updateStylusTimings(click: Long, double: Long) {
+        require(installed.any { it.pkg.feature == "stylus.hover" } && click in 100L..1000L && double in 150L..800L)
+        check(prefs.edit().putLong("setting:advanced-stylus:click-ms", click)
+            .putLong("setting:advanced-stylus:double-ms", double).commit()) { "Cannot save stylus timing" }
+        settingsRevision++
+    }
+
     fun scriptFor(command: String): DeclarativePackage? =
         if (safeMode) null else installed.firstOrNull {
             it.enabled && it.pkg.script != null && command == "${it.pkg.id}:open"

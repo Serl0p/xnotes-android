@@ -6377,7 +6377,7 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
     private fun dispatchTapGesture(action: String, at: Pt? = null) {
         val script = declarativePlugins.scriptFor(action)
         if (script != null) {
-            requestScriptMenu(script)
+            requestScriptMenu(script, at)
         } else if (action == "advanced-pdf-annotations:open") {
             openPluginPanel(action)
         } else if (action == "pen-menu:open") {
@@ -6461,15 +6461,19 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
         private set
     internal fun dismissScriptMenu() { scriptMenuRequest = null }
 
-    private fun requestScriptMenu(pkg: com.xnotes.plugins.DeclarativePackage) {
-        if (!noteOpen || scriptMenuRequest != null) return
+    private fun requestScriptMenu(pkg: com.xnotes.plugins.DeclarativePackage, at: Pt?) {
+        if (!noteOpen) return
+        if (scriptMenuRequest != null) { dismissScriptMenu(); return }
         val canvas = if (canvasOpen) infinite else null
+        val surface: android.view.View = canvas?.view ?: view
+        val anchor = at ?: Pt(surface.width / 2.0, surface.height / 2.0)
+        (canvas?.penMenu ?: penMenu).close()
         val allowed = listOf(Tool.PEN, Tool.DASHED, Tool.CALLIGRAPHY, Tool.SPEED, Tool.TAPER,
             Tool.HIGHLIGHTER, Tool.ERASER, Tool.PAN, Tool.SELECT, Tool.LASSO, Tool.SHAPE) +
             (if (canvas == null && hasPdf) listOf(Tool.MARKUP) else emptyList())
         declarativePlugins.executeScript(pkg, canvas?.extensions?.commands ?: extensions.commands) {
             scriptMenuRequest = com.xnotes.plugins.ScriptMenuRequest(pkg, (canvas?.tool ?: tool).id,
-                canvasOpen, declarativePlugins.scriptSettings(pkg), allowed.map { it.id })
+                canvasOpen, declarativePlugins.scriptSettings(pkg), allowed.map { it.id }, anchor)
         }
     }
 
@@ -6502,16 +6506,21 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
             android.os.Build.MANUFACTURER.equals("samsung", ignoreCase = true) &&
             declarativePlugins.featureEnabled("stylus.hover")
         val sequence = com.xnotes.canvas.HoverClickSequence(
-            schedule = { task -> surface.postDelayed(task, 300L) },
+            schedule = { task -> surface.postDelayed(task, declarativePlugins.stylusDoubleMs()) },
             cancel = { task -> surface.removeCallbacks(task) },
             deliver = { action, at -> if (active()) dispatchTapGesture(action, at) },
+            windowMs = { declarativePlugins.stylusDoubleMs() },
+            now = { android.os.SystemClock.uptimeMillis() },
         )
+        side.clickTimeoutMs = { if (active()) declarativePlugins.stylusClickMs() else null }
         side.clicking = { active() && (preferences.stylusButtonTap != "none" || preferences.stylusDoubleTap != "none") }
         side.onClick = { at ->
             if (active()) sequence.click(at, preferences.stylusButtonTap, preferences.stylusDoubleTap)
         }
         side.onContact = { sequence.reset() }
-        side.touchClosesMenu = { menu.takesTouch() }
+        side.touchClosesMenu = {
+            if (scriptMenuRequest != null) { dismissScriptMenu(); true } else menu.takesTouch()
+        }
     }
 
     internal fun cancelPluginClicks() {
@@ -6521,6 +6530,7 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
     }
 
     internal fun resetPluginInput() {
+        dismissScriptMenu()
         cancelPluginClicks()
         penMenu.close()
         infiniteOrNull?.penMenu?.close()

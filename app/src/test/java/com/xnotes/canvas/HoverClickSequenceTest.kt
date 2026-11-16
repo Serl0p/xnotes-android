@@ -10,6 +10,18 @@ class HoverClickSequenceTest {
     private val sequence = HoverClickSequence({ queue.add(it) }, { queue.remove(it) }, { action, _ -> result.add(action) })
     private val pt = Pt(1.0, 2.0)
 
+    @Test fun expiredClickIsNotADoubleEvenIfTimerIsLate() {
+        var now = 0L
+        val delayed = HoverClickSequence({ queue.add(it) }, { queue.remove(it) }, { action, _ -> result.add(action) },
+            windowMs = { 180L }, now = { now })
+        delayed.click(pt, "undo", "redo")
+        now = 200L
+        delayed.click(pt, "undo", "redo")
+        assertEquals(listOf("undo"), result)
+        queue.removeAt(0).run()
+        assertEquals(listOf("undo", "undo"), result)
+    }
+
     @Test fun singleWithoutDoubleIsImmediate() {
         sequence.click(pt, "undo", "none")
         assertEquals(listOf("undo"), result)

@@ -10,6 +10,13 @@ class ButtonClickTest {
 
     private val click = ButtonClick { 400L }
 
+    @Test fun hoverOverrideDoesNotChangeNextNativePress() {
+        click.onPress(1000, 200)
+        assertFalse(click.onRelease(1200))
+        click.onPress(1500)
+        assertTrue(click.onRelease(1790))
+    }
+
     private fun pen(action: Int) = click.onTouch(action, MotionEvent.TOOL_TYPE_STYLUS)
 
     @Test

@@ -551,10 +551,6 @@ fun PreferencesPane(
             }
 
             HorizontalDivider(color = palette.border.toComposeColor())
-            SectionTitle("Community plugins")
-            CommunityPlugins(editor)
-
-            HorizontalDivider(color = palette.border.toComposeColor())
             SectionTitle(stringResource(R.string.pref_toolbar))
             // The look, like the swatch count below, is one setting for both bars.
             val look = prefs.toolbarLook

@@ -1518,6 +1518,7 @@ private fun EditorPane(
                         com.xnotes.ui.LongPressMenu(canvas, onInsertImageAt = { c -> actions.onInsertCanvasImage(editor, c) })
                         com.xnotes.ui.PenMenu(canvas)
                         com.xnotes.ui.CanvasDebugOverlay(canvas)
+                        com.xnotes.ui.ScriptPluginDialog(editor)
                     }
                 }
             } else {
@@ -1579,6 +1580,7 @@ private fun EditorPane(
                             com.xnotes.ui.FlowTableMenu(editor)
                             com.xnotes.ui.TableChrome(editor)
                             ZoomLockHint(editor)
+                            com.xnotes.ui.ScriptPluginDialog(editor)
                         }
                     }
                 }
@@ -1588,7 +1590,6 @@ private fun EditorPane(
         }
         com.xnotes.ui.ColorDropOverlay(if (editor.canvasOpen) editor.infinite else editor)
         com.xnotes.ui.PluginExportDialog(editor)
-        com.xnotes.ui.ScriptPluginDialog(editor)
         com.xnotes.ui.PluginSelectionCommentDialog(editor)
     }
 }

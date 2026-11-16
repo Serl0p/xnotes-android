@@ -164,7 +164,7 @@ import kotlinx.coroutines.withTimeout
 import kotlin.math.roundToInt
 
 /** Which pane the backstage shows on the right. */
-enum class BackstageView { HOME, PREFERENCES, ABOUT, TRASH }
+enum class BackstageView { HOME, PREFERENCES, ABOUT, TRASH, PLUGINS }
 
 /** Whether the Home explorer is awaiting a new file/folder name. */
 private enum class CreateMode { NONE, FILE, CANVAS, FOLDER }
@@ -485,12 +485,13 @@ private fun BackstageSidebar(modifier: Modifier, nav: SidebarNav, onCollapse: ()
             }
         }
         RailDivider()
+        Command(XnotesIcons.sliders, stringResource(R.string.preferences), selected = nav.view == BackstageView.PREFERENCES) { nav.onSelectView(BackstageView.PREFERENCES) }
+        Command(XnotesIcons.plugins, "Plugins", selected = nav.view == BackstageView.PLUGINS) { nav.onSelectView(BackstageView.PLUGINS) }
         if (nav.trashCount >= 0) {
             Command(XnotesIcons.trash, stringResource(R.string.trash), selected = nav.view == BackstageView.TRASH, count = nav.trashCount.takeIf { it > 0 }?.toString()) {
                 nav.onSelectView(BackstageView.TRASH)
             }
         }
-        Command(XnotesIcons.sliders, stringResource(R.string.preferences), selected = nav.view == BackstageView.PREFERENCES) { nav.onSelectView(BackstageView.PREFERENCES) }
         Command(XnotesIcons.info, stringResource(R.string.about), selected = nav.view == BackstageView.ABOUT) { nav.onSelectView(BackstageView.ABOUT) }
     }
 }
@@ -525,8 +526,9 @@ private fun BackstageRail(modifier: Modifier, nav: SidebarNav, onExpand: () -> U
                 }
             }
         }
-        if (nav.trashCount >= 0) RailItem(XnotesIcons.trash, stringResource(R.string.trash), selected = nav.view == BackstageView.TRASH) { nav.onSelectView(BackstageView.TRASH) }
         RailItem(XnotesIcons.sliders, stringResource(R.string.preferences), selected = nav.view == BackstageView.PREFERENCES) { nav.onSelectView(BackstageView.PREFERENCES) }
+        RailItem(XnotesIcons.plugins, "Plugins", selected = nav.view == BackstageView.PLUGINS) { nav.onSelectView(BackstageView.PLUGINS) }
+        if (nav.trashCount >= 0) RailItem(XnotesIcons.trash, stringResource(R.string.trash), selected = nav.view == BackstageView.TRASH) { nav.onSelectView(BackstageView.TRASH) }
         RailItem(XnotesIcons.info, stringResource(R.string.about), selected = nav.view == BackstageView.ABOUT) { nav.onSelectView(BackstageView.ABOUT) }
     }
 }
@@ -578,6 +580,7 @@ private fun BackstageMain(
             when (view) {
                 BackstageView.HOME -> HomePane(editor, calls, createMode, onCreateMode, sidebarOpen, onShowSidebar, link)
                 BackstageView.PREFERENCES -> PreferencesPane(editor, compact, sidebarOpen, onShowSidebar, onBackToHome, onImportCodeTheme, onImportFont, onBackup)
+                BackstageView.PLUGINS -> PluginsPane(editor, compact, sidebarOpen, onShowSidebar, onBackToHome)
                 BackstageView.TRASH -> TrashPane(editor, sidebarOpen, onShowSidebar, onOpenPreferences)
                 BackstageView.ABOUT -> AboutPane()
             }
