@@ -1,18 +1,85 @@
 {
   "id": "quick-tool-menu",
   "name": "Quick Tool Menu",
-  "version": "1.1.0",
-  "apiVersion": 5,
+  "version": "2.0.0",
+  "apiVersion": 8,
   "type": "javascript",
-  "description": "A programmable radial tool menu at the stylus position, with editable favorites and menu size.",
+  "description": "Visual radial tool editor with native hue wheel, favorite colors and editable ring size.",
   "permissions": [
     "scripts.execute",
     "ui.popup",
     "tools.select",
-    "commands.register"
+    "commands.register",
+    "tools.color"
   ],
   "settings": {
-    "favorites": "pen,highlighter,eraser,lasso,pan,markup",
-    "limit": "7"
+    "favorites": "pen,highlighter,eraser,lasso,pan,markup,calligraphy,shape",
+    "limit": "8",
+    "center": "palette",
+    "size": "regular",
+    "active-first": "false",
+    "colors": ""
+  },
+  "settingsUi": {
+    "favorites": {
+      "type": "tool-list",
+      "label": "Tools (clockwise from the top)",
+      "min": 1,
+      "max": 10,
+      "preview": true
+    },
+    "limit": {
+      "type": "slider",
+      "label": "Maximum tool slots",
+      "min": 3,
+      "max": 10,
+      "step": 1
+    },
+    "center": {
+      "type": "select",
+      "label": "Center control",
+      "choices": [
+        {
+          "value": "palette",
+          "label": "Color wheel"
+        },
+        {
+          "value": "swatches",
+          "label": "Color swatches"
+        },
+        {
+          "value": "close",
+          "label": "Close button"
+        }
+      ]
+    },
+    "size": {
+      "type": "select",
+      "label": "Menu size",
+      "choices": [
+        {
+          "value": "compact",
+          "label": "Compact"
+        },
+        {
+          "value": "regular",
+          "label": "Regular"
+        },
+        {
+          "value": "large",
+          "label": "Large"
+        }
+      ]
+    },
+    "active-first": {
+      "type": "toggle",
+      "label": "Move current tool to the first slot"
+    },
+    "colors": {
+      "type": "color-list",
+      "label": "Favorite colors (optional)",
+      "min": 0,
+      "max": 6
+    }
   }
 }

@@ -36,10 +36,10 @@ internal fun PluginPaletteOverlay(request: ScriptMenuRequest, menu: ScriptMenu, 
     val active = host.hostToolbarColors.getOrNull(host.hostActiveColorIndex) ?: Rgba(0,0,0)
     val swatches = host.shownSwatches.take(6)
     val custom = menu.colors.mapNotNull { Rgba.fromHex(it) }
-    val desired = when(menu.size) { "compact" -> 300.dp; "large" -> 380.dp; else -> 342.dp }
+    val desired = radialExtent(menu.center,menu.size).dp
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val extent = minOf(desired,maxWidth-8.dp,maxHeight-8.dp)
-        if (extent >= 280.dp) {
+        if (extent >= (if(menu.center=="close") 226.dp else 280.dp)) {
             BackHandler(onBack = dismiss)
             val density = LocalDensity.current
             val half = extent.value / 2
@@ -56,7 +56,7 @@ internal fun PluginPaletteOverlay(request: ScriptMenuRequest, menu: ScriptMenu, 
             // Small pane fallback uses the same native palette and explicit commit actions.
             AlertDialog(onDismissRequest=dismiss,title={Text(menu.title)},text={
                 Column(Modifier.verticalScroll(rememberScrollState()),horizontalAlignment=Alignment.CenterHorizontally) {
-                    PaletteCenter(menu.center, active, swatches, custom, 150f, dismiss, apply)
+                    if(menu.center!="close") PaletteCenter(menu.center, active, swatches, custom, 150f, dismiss, apply)
                     menu.items.forEach { item ->
                         TextButton(onClick={choose(item.tool)},modifier=Modifier.fillMaxWidth()) {
                             ScriptToolIcon(item,item.tool==request.activeTool)
@@ -76,7 +76,7 @@ internal fun PaletteRadial(menu:ScriptMenu, selected:String, extent:Float, activ
     apply:(Rgba,Int?)->Unit) {
     val palette=LocalPalette.current
     val half=extent/2
-    val button=(extent*0.17f).coerceIn(46f,64f)
+    val button=(extent*(if(menu.center=="close") 0.23f else 0.17f)).coerceIn(46f,64f)
     val radius=half-button/2-5
     Box(Modifier.size(extent.dp)) {
         Box(Modifier.fillMaxSize().clip(CircleShape).background(palette.menuBg.toComposeColor())
@@ -96,7 +96,12 @@ internal fun PaletteRadial(menu:ScriptMenu, selected:String, extent:Float, activ
             }
         }
         Box(Modifier.align(Alignment.Center)) {
-            PaletteCenter(menu.center,active,swatches,custom,extent*0.43f,dismiss,apply)
+            if(menu.center=="close"){
+                Box(Modifier.size(48.dp).clip(CircleShape).background(palette.menuBg.toComposeColor())
+                    .clickable(onClickLabel="Close tool menu",onClick=dismiss),contentAlignment=Alignment.Center){
+                    Icon(XnotesIcons.close,"Close tool menu",tint=palette.text.toComposeColor())
+                }
+            } else PaletteCenter(menu.center,active,swatches,custom,extent*0.43f,dismiss,apply)
         }
     }
 }
@@ -126,7 +131,8 @@ private fun PaletteCenter(mode:String,active:Rgba,swatches:List<Rgba>,custom:Lis
         }
         if(mode=="palette"){
             Row(horizontalArrangement=Arrangement.spacedBy(3.dp)){
-                (swatches.mapIndexed { i,c->c to i }+custom.map{it to null}).take(6).forEach{(c,index)->
+                val favorites=custom.map{it to null}
+                (favorites+swatches.mapIndexed { i,c->c to i }).take(6).forEach{(c,index)->
                     PaletteChip(c,(width/7).coerceIn(18f,24f),"Choose ${Rgba.toHex(c)}"){apply(c,index)}
                 }
             }
@@ -152,3 +158,7 @@ internal fun PaletteChip(color:Rgba,size:Float,label:String,action:()->Unit){
     Box(Modifier.size(size.dp).clip(CircleShape).background(color.toComposeColor())
         .border(1.dp,palette.border.toComposeColor(),CircleShape).clickable(onClickLabel=label,onClick=action))
 }
+
+internal fun radialExtent(center:String,size:String):Float =
+    if(center=="close") when(size){"compact"->226f;"large"->300f;else->260f}
+    else when(size){"compact"->300f;"large"->380f;else->342f}

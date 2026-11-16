@@ -58,7 +58,7 @@ internal object ScriptMenuRuntime {
                 val c = a.get(i); require(c is String && Regex("#[0-9a-fA-F]{6}").matches(c)); c
             }.distinct()
         } else emptyList()
-        require(layout != "radial" || items.size <= if (center == "close") 8 else 10) { "Too many radial entries" }
+        require(layout != "radial" || items.size <= (if (center == "close") 8 else 10)) { "Too many radial entries" }
         require(items.map { it.tool }.distinct().size == items.size) { "Duplicate tools" }
         return ScriptMenu(title, items, layout, center, size, colors)
     }

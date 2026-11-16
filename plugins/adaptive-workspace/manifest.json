@@ -1,9 +1,9 @@
 {
   "id": "adaptive-workspace",
   "name": "Adaptive Workspace",
-  "version": "1.0.0",
-  "description": "JavaScript selects different toolbar controls for PDF notes, handwriting and infinite canvases.",
-  "apiVersion": 7,
+  "version": "1.1.0",
+  "description": "Adaptive toolbars with visual layout, pen group, primary tool and width settings.",
+  "apiVersion": 8,
   "type": "toolbar-javascript",
   "permissions": [
     "scripts.execute",
@@ -16,6 +16,82 @@
     "floating": "false",
     "widths": "1.5,2.5,4,8",
     "rows": "2",
-    "background": ""
+    "background": "",
+    "pens": "pen,dashed,calligraphy,speed,taper",
+    "primary": "highlighter,eraser,lasso,pan,shape"
+  },
+  "settingsUi": {
+    "position": {
+      "type": "select",
+      "label": "Toolbar position",
+      "choices": [
+        {
+          "value": "top",
+          "label": "Top"
+        },
+        {
+          "value": "bottom",
+          "label": "Bottom"
+        },
+        {
+          "value": "left",
+          "label": "Left"
+        },
+        {
+          "value": "right",
+          "label": "Right"
+        }
+      ]
+    },
+    "size": {
+      "type": "select",
+      "label": "Toolbar size",
+      "choices": [
+        {
+          "value": "compact",
+          "label": "Compact"
+        },
+        {
+          "value": "regular",
+          "label": "Regular"
+        },
+        {
+          "value": "comfortable",
+          "label": "Comfortable"
+        }
+      ]
+    },
+    "floating": {
+      "type": "toggle",
+      "label": "Floating toolbar"
+    },
+    "widths": {
+      "type": "text",
+      "label": "Stroke widths (comma-separated)"
+    },
+    "rows": {
+      "type": "slider",
+      "label": "Toolbar rows",
+      "min": 1,
+      "max": 2,
+      "step": 1
+    },
+    "background": {
+      "type": "color",
+      "label": "Toolbar background",
+      "optional": true
+    },
+    "pens": {
+      "type": "tool-list",
+      "label": "Tools in the pen group",
+      "min": 1,
+      "max": 12
+    },
+    "primary": {
+      "type": "tool-list",
+      "label": "Primary tools (in order)",
+      "min": 1,
+      "max": 12
+    }
   }
 }

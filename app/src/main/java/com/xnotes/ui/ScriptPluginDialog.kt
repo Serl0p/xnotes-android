@@ -63,7 +63,7 @@ internal fun ScriptPluginDialog(editor: Editor) {
         catch (e: Exception) { error = "Script stopped or rejected. " + (e.message ?: "Unknown error").take(240) }
     }
     val rich = menu
-    if (error == null && rich != null && rich.layout == "radial" && rich.center != "close") {
+    if (error == null && rich != null && rich.layout == "radial" && request.pkg.paletteAccess) {
         val host: ToolPopupHost = if (editor.canvasOpen) editor.infinite else editor
         PluginPaletteOverlay(request, rich, host, editor::dismissScriptMenu,
             { id -> editor.chooseScriptTool(request,id) },

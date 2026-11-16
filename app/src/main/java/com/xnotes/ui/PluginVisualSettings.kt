@@ -32,7 +32,7 @@ internal fun PluginVisualSettings(pkg:DeclarativePackage, saved:Map<String,Strin
     val valid=draft.all{(k,v)->pkg.settingsUi[k]?.valid(v)!=false}
     Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
         for((key,default) in pkg.scriptDefaults){
-            key(key){
+            androidx.compose.runtime.key(key){
                 val field=pkg.settingsUi[key]
                 val value=draft[key]?:default
                 Text(field?.label?:key,fontSize=13.sp)
@@ -54,17 +54,20 @@ internal fun PluginVisualSettings(pkg:DeclarativePackage, saved:Map<String,Strin
             }
         }
         pkg.settingsUi.entries.firstOrNull{it.value.preview}?.let{(key,field)->
-            val tools=field.values(draft[key].orEmpty()).take(draft["limit"]?.toIntOrNull()?.coerceIn(1,10)?:8)
+            val center=draft["center"]?.takeIf{it in listOf("palette","swatches","close")} ?: "palette"
+            val cap=if(center=="close")8 else 10
+            val size=draft["size"]?.takeIf{it in listOf("compact","regular","large")} ?: "regular"
+            val tools=field.values(draft[key].orEmpty()).take(draft["limit"]?.toIntOrNull()?.coerceIn(1,cap)?:cap)
             if(tools.isNotEmpty()){
                 Text("Live menu preview",fontSize=13.sp)
-                val items=tools.map{ScriptMenuItem(PluginSettingsSchema.tools[it]?:it,it)}
-                var previewTool by remember(items){mutableStateOf(items.first().tool)}
+                val baseItems=tools.map{ScriptMenuItem(PluginSettingsSchema.tools[it]?:it,it)}
+                var previewTool by remember(baseItems){mutableStateOf(baseItems.first().tool)}
                 var previewInk by remember{mutableStateOf(Rgba(65,137,221))}
-                val center=draft["center"]?.takeIf{it in listOf("palette","swatches","close")} ?: "palette"
-                val menu=ScriptMenu("Preview",items,"radial",center)
+                val items=if(draft["active-first"]=="true")baseItems.sortedBy{it.tool!=previewTool} else baseItems
+                val menu=ScriptMenu("Preview",items,"radial",center,size)
                 BoxWithConstraints(Modifier.fillMaxWidth(),contentAlignment=Alignment.Center){
-                    val extent=minOf(maxWidth.value,340f)
-                    if(extent>=260f) PaletteRadial(menu,previewTool,extent,previewInk,
+                    val extent=minOf(maxWidth.value,radialExtent(center,size))
+                    if(extent>=(if(center=="close")226f else 260f)) PaletteRadial(menu,previewTool,extent,previewInk,
                         listOf(Rgba(20,20,20),Rgba(255,255,255),Rgba(65,137,221),Rgba(220,80,91)),
                         draft["colors"].orEmpty().split(',').mapNotNull{Rgba.fromHex(it)}, {},
                         {previewTool=it},{c,_->previewInk=c})

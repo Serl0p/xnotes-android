@@ -13,3 +13,5 @@ Use this toolbar. Update by importing a new archive with same id, higher version
 For popup scripts, assign a gesture in Preferences > Input. A package is ZIP with its
 files at root; do not compress the enclosing directory. The Android host is the authoritative
 validator. This tool only checks basic structure and limits.
+
+API 8 visual settings and palette menu contract: [API 8](../docs/plugin-api-8.md).
