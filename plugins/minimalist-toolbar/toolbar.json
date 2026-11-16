@@ -1,0 +1,34 @@
+{
+  "style": {
+    "size": "compact",
+    "floating": true,
+    "radius": 18,
+    "spacing": 1
+  },
+  "collapsible": true,
+  "rows": [
+    [
+      "home",
+      {
+        "type": "group",
+        "label": "Pens",
+        "tools": [
+          "pen",
+          "dashed",
+          "calligraphy",
+          "speed",
+          "taper"
+        ]
+      },
+      "highlighter",
+      "eraser",
+      "lasso",
+      "pan",
+      "markup",
+      "undo",
+      "redo",
+      "colors",
+      "view"
+    ]
+  ]
+}

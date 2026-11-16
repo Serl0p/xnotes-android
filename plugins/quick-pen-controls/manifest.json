@@ -1,0 +1,12 @@
+{
+  "id": "quick-pen-controls",
+  "name": "Quick Pen Controls",
+  "version": "1.0.0",
+  "description": "A two-row toolbar with visible width presets, swatches and common tool controls.",
+  "apiVersion": 6,
+  "type": "toolbar",
+  "permissions": [
+    "ui.toolbar",
+    "ui.controls"
+  ]
+}

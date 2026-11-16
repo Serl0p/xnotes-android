@@ -1,0 +1,53 @@
+{
+  "style": {
+    "position": "top",
+    "size": "compact",
+    "floating": false,
+    "spacing": 1
+  },
+  "collapsible": true,
+  "rows": [
+    [
+      "home",
+      "title",
+      "sidebar",
+      "pen",
+      "highlighter",
+      "eraser",
+      "lasso",
+      "pan",
+      "markup",
+      "text",
+      "shape",
+      "undo",
+      "redo",
+      "view",
+      "page_nav",
+      "waypoints"
+    ],
+    [
+      "colors",
+      {
+        "type": "width",
+        "value": 1.5
+      },
+      {
+        "type": "width",
+        "value": 2.5
+      },
+      {
+        "type": "width",
+        "value": 4
+      },
+      {
+        "type": "width",
+        "value": 8
+      },
+      "image",
+      "styles",
+      "zoom",
+      "fit",
+      "zoom_lock"
+    ]
+  ]
+}

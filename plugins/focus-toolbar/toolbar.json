@@ -1,0 +1,21 @@
+{
+  "style": {
+    "size": "compact",
+    "floating": true,
+    "radius": 24,
+    "spacing": 0
+  },
+  "collapsible": true,
+  "rows": [
+    [
+      "home",
+      "pen",
+      "markup",
+      "highlighter",
+      "eraser",
+      "undo",
+      "redo",
+      "view"
+    ]
+  ]
+}

@@ -13,8 +13,8 @@ internal data class ToolbarStyleSpec(
     val background: String? = null, val radius: Int? = null, val spacing: Int = 0,
 ) {
     fun apply(base: ToolbarLook) = base.copy(
-        position = position?.let(ToolbarPosition::fromId) ?: base.position,
-        size = size?.let(ToolbarSize::fromId) ?: base.size,
+        position = position?.let { ToolbarPosition.fromId(it) } ?: base.position,
+        size = size?.let { ToolbarSize.fromId(it) } ?: base.size,
         floating = floating ?: base.floating,
     )
 }

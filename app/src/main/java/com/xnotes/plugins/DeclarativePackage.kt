@@ -76,7 +76,7 @@ internal object DeclarativePackages {
         if (manifest.get("type") in setOf("toolbar", "toolbar-javascript")) {
             val scripted = manifest.get("type") == "toolbar-javascript"
             val required = if (scripted) setOf("scripts.execute", "ui.toolbar", "ui.controls") else setOf("ui.toolbar", "ui.controls")
-            require(manifest.get("apiVersion") == if (scripted) 7 else 6)
+            require(manifest.get("apiVersion") == (if (scripted) 7 else 6)) { "Unsupported toolbar API" }
             require(!manifest.has("feature") && NativeFeature.entries.none { it.owner == id })
             val file = if (scripted) "main.js" else "toolbar.json"
             require(entries.keys == setOf("manifest.json", file)) { "Unexpected toolbar package entries" }
@@ -86,7 +86,11 @@ internal object DeclarativePackages {
             val source = entries.getValue(file).toString(Charsets.UTF_8)
             require(source.isNotBlank() && source.length <= 32768) { "Invalid toolbar source size" }
             val defaults = readSettings(manifest)
-            if (!scripted) ToolbarSpecs.parse(source, false, true).also { ToolbarSpecs.parse(source, true, false) }
+            if (!scripted) {
+                ToolbarSpecs.parse(source, false, false)
+                ToolbarSpecs.parse(source, false, true)
+                ToolbarSpecs.parse(source, true, false)
+            }
             return DeclarativePackage(id, name, version, manifest.string("description", 300), emptyList(),
                 bytes.copyOf(), scriptDefaults = defaults, toolbar = source, toolbarScript = scripted)
         }

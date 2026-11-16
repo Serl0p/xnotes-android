@@ -1,0 +1,21 @@
+{
+  "id": "adaptive-workspace",
+  "name": "Adaptive Workspace",
+  "version": "1.0.0",
+  "description": "JavaScript selects different toolbar controls for PDF notes, handwriting and infinite canvases.",
+  "apiVersion": 7,
+  "type": "toolbar-javascript",
+  "permissions": [
+    "scripts.execute",
+    "ui.toolbar",
+    "ui.controls"
+  ],
+  "settings": {
+    "position": "top",
+    "size": "compact",
+    "floating": "false",
+    "widths": "1.5,2.5,4,8",
+    "rows": "2",
+    "background": ""
+  }
+}

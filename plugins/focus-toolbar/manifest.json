@@ -1,0 +1,12 @@
+{
+  "id": "focus-toolbar",
+  "name": "Focus Toolbar",
+  "version": "1.0.0",
+  "description": "A small collapsible toolbar for distraction-free reading and writing.",
+  "apiVersion": 6,
+  "type": "toolbar",
+  "permissions": [
+    "ui.toolbar",
+    "ui.controls"
+  ]
+}

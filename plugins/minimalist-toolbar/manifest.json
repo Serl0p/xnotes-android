@@ -1,0 +1,12 @@
+{
+  "id": "minimalist-toolbar",
+  "name": "Minimalist Toolbar",
+  "version": "1.0.0",
+  "description": "Group pen types, show common tools, and collapse the toolbar.",
+  "apiVersion": 6,
+  "type": "toolbar",
+  "permissions": [
+    "ui.toolbar",
+    "ui.controls"
+  ]
+}
