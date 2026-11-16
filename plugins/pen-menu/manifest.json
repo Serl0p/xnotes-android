@@ -1,0 +1,13 @@
+{
+  "id": "pen-menu",
+  "name": "Pen Menu",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "type": "declarative",
+  "description": "Open the active native tool settings at the pen position or center of the editor using a mapped gesture.",
+  "feature": "ui.pen_menu",
+  "permissions": [
+    "ui.pen_menu",
+    "commands.register"
+  ]
+}

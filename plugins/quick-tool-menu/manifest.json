@@ -1,0 +1,18 @@
+{
+  "id": "quick-tool-menu",
+  "name": "Quick Tool Menu",
+  "version": "1.1.0",
+  "apiVersion": 5,
+  "type": "javascript",
+  "description": "A programmable radial tool menu at the stylus position, with editable favorites and menu size.",
+  "permissions": [
+    "scripts.execute",
+    "ui.popup",
+    "tools.select",
+    "commands.register"
+  ],
+  "settings": {
+    "favorites": "pen,highlighter,eraser,lasso,pan,markup",
+    "limit": "7"
+  }
+}
