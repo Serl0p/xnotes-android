@@ -110,6 +110,7 @@ internal fun CommunityPlugins(editor: Editor) {
                 "document.annotations" -> Text("Open a paged note, then View > Annotation Exporter.", fontSize = 12.sp)
                 "document.obsidian" -> Text("Open a paged note, then View > Obsidian Companion.", fontSize = 12.sp)
                 "document.annotation_tools" -> Text("View > Advanced PDF Annotations. Select PDF text and use the selection menu (…) to add a comment.", fontSize = 12.sp)
+                "document.export" -> Text("View > Universal Exporter. Includes PDF++ callouts, custom templates and Sidemark bundles.", fontSize = 12.sp)
             }
             for (profile in pkg.profiles) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -140,7 +141,7 @@ internal fun CommunityPlugins(editor: Editor) {
                     } else when (pkg.feature) {
                         "stylus.hover" -> Text("Requested permission: Recognize nearby stylus button gestures. No executable code.")
                         "ui.pen_menu" -> Text("Requested permissions: Open native tool settings and register a command. No executable code.")
-                        "document.annotations", "document.obsidian", "document.annotation_tools" -> {
+                        "document.annotations", "document.obsidian", "document.annotation_tools", "document.export" -> {
                             val native = com.xnotes.plugins.NativeFeature.find(pkg.feature)
                             Text("Requested permissions: " + (native?.explanation ?: "") + " Register a command. No scripts or background access.")
                         }

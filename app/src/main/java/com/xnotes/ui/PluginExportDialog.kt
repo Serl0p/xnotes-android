@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xnotes.plugins.DocumentExports
+import com.xnotes.plugins.ExportLayout
 import com.xnotes.plugins.ExportFormat
 import com.xnotes.plugins.ExportGroup
 import com.xnotes.plugins.ExportKind
@@ -54,7 +55,7 @@ internal fun PluginExportDialog(editor: Editor) {
                 try {
                     withContext(Dispatchers.IO) {
                         requireNotNull(context.contentResolver.openOutputStream(uri, "w")) { "Cannot open destination" }.use {
-                            it.write(request.second.content.toByteArray(Charsets.UTF_8))
+                            request.second.writeTo(it)
                         }
                     }
                     editor.say("Export saved")
@@ -67,8 +68,13 @@ internal fun PluginExportDialog(editor: Editor) {
     if (!manager.featureEnabled(request.first.feature) || editor.canvasOpen) return
     val (kind, doc) = request
     var options by remember(request) { mutableStateOf(ExportOptions(relativeLink = doc.fileName.orEmpty())) }
+    var offsetText by remember(request) { mutableStateOf("0") }
     var error by remember(request) { mutableStateOf<String?>(null) }
-    fun build(): ExportPayload? = try { DocumentExports.render(doc, kind, options) }
+    fun build(): ExportPayload? = try {
+        val offset = if (options.layout == ExportLayout.STANDARD || options.format != ExportFormat.MARKDOWN) 0
+            else requireNotNull(offsetText.toIntOrNull()) { "Enter a valid page offset" }
+        DocumentExports.render(doc, kind, options.copy(printedOffset = offset))
+    }
         catch (e: Exception) { error = e.message ?: "Cannot prepare export"; null }
     fun dismiss() { editor.dismissPluginExport() }
     AlertDialog(
@@ -77,17 +83,50 @@ internal fun PluginExportDialog(editor: Editor) {
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("${doc.title} · ${doc.annotations.size} native PDF annotations", fontSize = 13.sp)
-                if (kind == ExportKind.ANNOTATIONS) {
+                if (kind != ExportKind.OBSIDIAN) {
                     Text("Format")
                     for (format in ExportFormat.entries) Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = options.format == format, onClick = { options = options.copy(format = format) })
                         Text(format.label)
                     }
-                } else {
+                }
+                if (kind == ExportKind.UNIVERSAL && options.format == ExportFormat.MARKDOWN) {
+                    Text("Markdown layout")
+                    for (layout in ExportLayout.entries) Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = options.layout == layout, onClick = { options = options.copy(layout = layout) })
+                        Text(layout.label)
+                    }
+                    if (options.layout != ExportLayout.STANDARD) {
+                        OutlinedTextField(value = options.pdfPath, onValueChange = { options = options.copy(pdfPath = it.take(500)) },
+                            label = { Text("Vault-relative original PDF path (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        Text("PDF links jump to pages, not exact selections.", fontSize = 12.sp)
+                        OutlinedTextField(offsetText, { offsetText = it.take(8) }, label = { Text("Printed page number offset") }, singleLine = true)
+                        OutlinedTextField(options.colorMap, { options = options.copy(colorMap = it.take(1800)) },
+                            label = { Text("Color mapping (optional #RRGGBB=name)") }, minLines = 2)
+                        if (options.layout == ExportLayout.CUSTOM) {
+                            OutlinedTextField(options.template, { options = options.copy(template = it.take(4000)) },
+                                label = { Text("Template") }, minLines = 4)
+                            Text("Tokens: colorName, colorHex, pdfLink, text, comment, notePage, pdfPage, pageLabel, id, type. Wrap in double braces.", fontSize = 12.sp)
+                        } else if (options.comments) {
+                            ExportCheck("Sidemark .review.yaml (ZIP bundle)", options.sidecar) { options = options.copy(sidecar = it) }
+                            if (options.sidecar) {
+                                ExportCheck("Also show comments inline", options.inlineComments) { options = options.copy(inlineComments = it) }
+                                OutlinedTextField(options.sidecarAuthor, { options = options.copy(sidecarAuthor = it.take(100)) }, label = { Text("Comment author") })
+                                Text("Extract the Markdown and sidecar together. Existing vault comments are never merged or overwritten automatically.", fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+                if (kind != ExportKind.ANNOTATIONS && options.format in listOf(ExportFormat.MARKDOWN, ExportFormat.TEXT)) {
                     Text("Save beside your .xnote or enter the relative path from the Markdown file. Leave blank to omit the link.", fontSize = 12.sp)
                     OutlinedTextField(value = options.relativeLink, onValueChange = { options = options.copy(relativeLink = it) },
                         label = { Text("Relative .xnote path") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     ExportCheck("Include typed text (plain text)", options.typed) { options = options.copy(typed = it) }
+                }
+                if (kind == ExportKind.UNIVERSAL) {
+                    ExportCheck("Include PDF annotations", options.includeAnnotations) { options = options.copy(includeAnnotations = it) }
+                    if (options.format == ExportFormat.JSON || options.format == ExportFormat.CSV)
+                        Text("Structured exports contain annotation records only.", fontSize = 12.sp)
                 }
                 Text("Sort / group annotations")
                 for (group in ExportGroup.entries) Row(verticalAlignment = Alignment.CenterVertically) {
@@ -108,6 +147,7 @@ internal fun PluginExportDialog(editor: Editor) {
                 TextButton(onClick = {
                     if (manager.featureEnabled(kind.feature)) build()?.let {
                         try {
+                            require(it.sidecar == null) { "Use Save as… for the sidecar bundle" }
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                             clipboard.setPrimaryClip(ClipData.newPlainText(it.fileName, it.content))
                             dismiss(); editor.say("Export copied")
@@ -118,7 +158,7 @@ internal fun PluginExportDialog(editor: Editor) {
                     if (manager.featureEnabled(kind.feature) && pending == null) build()?.let {
                         pending = kind to it
                         dismiss()
-                        try { save.launch(it.fileName) } catch (e: Exception) { pending = null; editor.say("Cannot open file picker") }
+                        try { save.launch(it.suggestedName) } catch (e: Exception) { pending = null; editor.say("Cannot open file picker") }
                     }
                 }) { Text("Save as…") }
             }

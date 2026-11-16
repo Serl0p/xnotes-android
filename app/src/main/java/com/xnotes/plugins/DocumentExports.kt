@@ -15,7 +15,7 @@ internal data class ExportDocument(
     val annotations: List<ExportAnnotation>, val typedText: List<ExportText>,
 )
 internal enum class ExportKind(val native: NativeFeature) {
-    ANNOTATIONS(NativeFeature.ANNOTATIONS), OBSIDIAN(NativeFeature.OBSIDIAN);
+    ANNOTATIONS(NativeFeature.ANNOTATIONS), OBSIDIAN(NativeFeature.OBSIDIAN), UNIVERSAL(NativeFeature.UNIVERSAL);
     val feature get() = native.key
     val command get() = native.command
     val label get() = native.label
@@ -24,14 +24,37 @@ internal enum class ExportFormat(val extension: String, val label: String) {
     MARKDOWN("md", "Markdown"), TEXT("txt", "Plain text"), JSON("json", "JSON"), CSV("csv", "CSV"),
 }
 internal enum class ExportGroup(val label: String) { PAGE("Page"), COLOR("Color"), TYPE("Type"), TIME("Chronological") }
+internal enum class ExportLayout(val label: String) { STANDARD("Standard"), PDF_CALLOUT("PDF++ callouts"), CUSTOM("Custom template") }
 internal data class ExportOptions(
     val format: ExportFormat = ExportFormat.MARKDOWN,
     val group: ExportGroup = ExportGroup.PAGE,
     val pages: Boolean = true, val colors: Boolean = true, val comments: Boolean = true,
     val timestamps: Boolean = false, val typed: Boolean = true,
     val relativeLink: String = "",
+    val includeAnnotations: Boolean = true,
+    val layout: ExportLayout = ExportLayout.STANDARD,
+    val pdfPath: String = "",
+    val printedOffset: Int = 0,
+    val colorMap: String = "",
+    val sidecar: Boolean = false,
+    val sidecarAuthor: String = "Me",
+    val inlineComments: Boolean = true,
+    val template: String = "> [!PDF|{{colorName}}] {{pdfLink}}\n> > {{text}}\n> {{comment}}",
 )
-internal data class ExportPayload(val fileName: String, val content: String, val format: ExportFormat)
+internal data class ExportPayload(val fileName: String, val content: String, val format: ExportFormat, val sidecar: String? = null) {
+    val suggestedName: String get() = if (sidecar == null) fileName else fileName.removeSuffix(".md") + ".zip"
+    fun writeTo(output: java.io.OutputStream) {
+        val review = sidecar
+        if (review == null) output.write(content.toByteArray(Charsets.UTF_8))
+        else java.util.zip.ZipOutputStream(output).use { zip ->
+            for ((name, text) in listOf(fileName to content, "$fileName.review.yaml" to review)) {
+                zip.putNextEntry(java.util.zip.ZipEntry(name))
+                zip.write(text.toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+            }
+        }
+    }
+}
 
 internal object DocumentExports {
     const val MAX_CHARS = 4_000_000
@@ -40,12 +63,15 @@ internal object DocumentExports {
     fun render(doc: ExportDocument, kind: ExportKind, opts: ExportOptions): ExportPayload {
         val format = if (kind == ExportKind.OBSIDIAN) ExportFormat.MARKDOWN else opts.format
         require(doc.annotations.size <= MAX_ANNOTATIONS) { "Too many annotations for a single export" }
+        val annotations = if (opts.includeAnnotations) doc.annotations else emptyList()
         val selected = when (opts.group) {
-            ExportGroup.PAGE -> doc.annotations.sortedWith(compareBy({ it.notePage }, { it.created }, { it.id }))
-            ExportGroup.COLOR -> doc.annotations.sortedWith(compareBy({ it.color }, { it.notePage }, { it.created }))
-            ExportGroup.TYPE -> doc.annotations.sortedWith(compareBy({ it.type }, { it.notePage }, { it.created }))
-            ExportGroup.TIME -> doc.annotations.sortedBy { it.created }
+            ExportGroup.PAGE -> annotations.sortedWith(compareBy({ it.notePage }, { it.created }, { it.id }))
+            ExportGroup.COLOR -> annotations.sortedWith(compareBy({ it.color }, { it.notePage }, { it.created }))
+            ExportGroup.TYPE -> annotations.sortedWith(compareBy({ it.type }, { it.notePage }, { it.created }))
+            ExportGroup.TIME -> annotations.sortedBy { it.created }
         }
+        if (kind == ExportKind.UNIVERSAL && format == ExportFormat.MARKDOWN && opts.layout != ExportLayout.STANDARD)
+            return PdfCalloutExports.render(doc, selected, opts)
         val content = when (format) {
             ExportFormat.MARKDOWN, ExportFormat.TEXT -> human(doc, kind, opts, selected, format == ExportFormat.MARKDOWN)
             ExportFormat.JSON -> json(doc, opts, selected)
@@ -53,7 +79,11 @@ internal object DocumentExports {
         }
         require(content.length <= MAX_CHARS) { "Export is too large; no file was written" }
         val stem = doc.title.map { if (it.isISOControl() || it in "\\/:*?\"<>|") '_' else it }.joinToString("").trim().take(120).ifBlank { "Untitled" }
-        val suffix = if (kind == ExportKind.OBSIDIAN) " - Companion" else " - Annotations"
+        val suffix = when (kind) {
+            ExportKind.OBSIDIAN -> " - Companion"
+            ExportKind.UNIVERSAL -> " - Export"
+            else -> " - Annotations"
+        }
         return ExportPayload(stem + suffix + "." + format.extension, content, format)
     }
 
@@ -79,10 +109,10 @@ internal object DocumentExports {
             append('\n')
         }
         heading(doc.title, 1)
-        if (kind == ExportKind.OBSIDIAN) {
+        if (kind == ExportKind.OBSIDIAN || kind == ExportKind.UNIVERSAL) {
             val link = o.relativeLink.trim()
             if (link.isNotBlank()) append("[Open original xNotes file](<").append(relativePath(link)).append(">)\n\n")
-            else append("No original note link specified.\n\n")
+            else if (kind == ExportKind.OBSIDIAN) append("No original note link specified.\n\n")
             append("Note pages: ").append(doc.pageCount).append("\n\n")
             if (o.typed && doc.typedText.isNotEmpty()) {
                 heading("Typed text", 2)
@@ -151,10 +181,10 @@ internal object DocumentExports {
             append('"')
         }
     }
-    private fun markdown(s: String) = buildString {
+    internal fun markdown(s: String) = buildString {
         for (c in s) { if (c in "\\`*_{}[]()#+-.!|<>~&=") append('\\'); append(c) }
     }
-    private fun relativePath(path: String): String {
+    internal fun relativePath(path: String): String {
         require(path.length <= 500 && !path.startsWith('/') && !path.contains('\\') && !path.contains(':') &&
             path.none { it.isISOControl() } && path.endsWith(".xnote", ignoreCase = true)) { "Enter a relative .xnote path" }
         require(path.split('/').none { it.isBlank() }) { "Invalid relative path" }

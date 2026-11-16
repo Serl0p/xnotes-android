@@ -8,7 +8,8 @@ internal fun DeclarativePluginManager.contributions(slot: PluginSlot): List<Plug
     if (safeMode) return emptyList()
     return when (slot) {
         PluginSlot.VIEW_MENU -> buildList {
-            for (kind in ExportKind.entries) if (featureEnabled(kind.feature))
+            val universal = featureEnabled(NativeFeature.UNIVERSAL.key)
+            for (kind in ExportKind.entries) if (featureEnabled(kind.feature) && (kind == ExportKind.UNIVERSAL || !universal))
                 kind.command?.let { add(PluginContribution(it, kind.label, slot)) }
             if (featureEnabled(NativeFeature.ADVANCED_ANNOTATIONS.key))
                 add(PluginContribution("advanced-pdf-annotations:open", "Advanced PDF Annotations", slot))

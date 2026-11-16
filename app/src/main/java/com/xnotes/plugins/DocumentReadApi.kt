@@ -15,7 +15,7 @@ internal object DocumentReadApi {
         } }.take(DocumentExports.MAX_ANNOTATIONS)
 
     fun snapshot(doc: Document, feature: NativeFeature): ExportDocument {
-        require(feature == NativeFeature.ANNOTATIONS || feature == NativeFeature.OBSIDIAN)
+        require(feature == NativeFeature.ANNOTATIONS || feature == NativeFeature.OBSIDIAN || feature == NativeFeature.UNIVERSAL)
         val typed = "document.text.read" in feature.permissions
         val metadata = "document.metadata.read" in feature.permissions
         val marks = mutableListOf<ExportAnnotation>()
