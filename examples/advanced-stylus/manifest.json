@@ -1,0 +1,12 @@
+{
+  "id": "advanced-stylus",
+  "name": "Advanced Stylus Controls",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "type": "declarative",
+  "description": "Recognize nearby Samsung S-Pen button clicks and double-clicks while retaining native hold gestures.",
+  "feature": "stylus.hover",
+  "permissions": [
+    "input.stylus"
+  ]
+}

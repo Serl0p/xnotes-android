@@ -1,0 +1,3 @@
+# Stylus feature packages
+
+Requires the experimental APK from commit 18da419 or later. Each package is a ZIP with its manifest.json at the root (rename to .xplugin). Import in Preferences > Community plugins. Enable Advanced Stylus Controls and optionally Pen Menu. Assign Pen Menu: Open tool settings to Stylus side button (tap), keeping double tap None for the first test. Then assign a double-tap action and test both. Samsung hover works only within digitizer range. No Bluetooth integration or executable code. Pen Menu also works independently via two-finger/three-finger taps. Existing Pen Profiles API 1 packages remain supported.
