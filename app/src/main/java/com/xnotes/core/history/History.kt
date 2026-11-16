@@ -26,29 +26,38 @@ class History(private val limit: Int = DEFAULT_LIMIT) {
     /** Told of every new edit as it is recorded; never of an undo or a redo. */
     var onPush: ((Command) -> Unit)? = null
 
+    enum class Change { PUSH, UNDO, REDO, CLEAR }
+
+    /** Separate post-stack notification; keep onPush's existing audio stamping semantics. */
+    var onChanged: ((Change) -> Unit)? = null
+
     /** Record an already-applied edit and invalidate any redo branch. */
     fun push(command: Command) {
         onPush?.invoke(command)
         undoStack.addLast(command)
         while (undoStack.size > limit) undoStack.removeFirst() // the oldest edit becomes unreachable
         redoStack.clear()
+        onChanged?.invoke(Change.PUSH)
     }
 
     fun undo() {
         val command = undoStack.removeLastOrNull() ?: return
         command.undo()
         redoStack.addLast(command)
+        onChanged?.invoke(Change.UNDO)
     }
 
     fun redo() {
         val command = redoStack.removeLastOrNull() ?: return
         command.redo()
         undoStack.addLast(command)
+        onChanged?.invoke(Change.REDO)
     }
 
     fun clear() {
         undoStack.clear()
         redoStack.clear()
+        onChanged?.invoke(Change.CLEAR)
     }
 
     companion object {

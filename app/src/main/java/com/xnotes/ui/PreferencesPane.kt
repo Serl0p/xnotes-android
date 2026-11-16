@@ -105,6 +105,7 @@ private val tapGestureOptions = listOf(
     "toggle_eraser" to R.string.toggle_eraser,
     "toggle_lasso" to R.string.toggle_lasso,
     "toggle_previous" to R.string.toggle_previous,
+    "select_pen" to R.string.tool_pen,
 )
 
 /**
