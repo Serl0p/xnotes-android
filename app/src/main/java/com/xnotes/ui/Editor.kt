@@ -828,6 +828,7 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
         // matching how a note opened from outside the root behaves.
         canvasAutosaveUri = if (uri != null && browseRoot?.let { isUnderTree(uri, it) } == true) uri else null
         canvasAutosaveUri?.let { rememberStamp(it) }
+        resetPluginPanels()
         dismissScriptMenu()
         canvasOpen = true
         noteOpen = true
@@ -1120,12 +1121,19 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
     }
 
     /** Marks [sel] as [type] in the active ink colour, a markup on each page it covers, as one undo step. */
-    fun markSelection(sel: com.xnotes.core.pdf.TextSelection, type: MarkupType) {
+    fun markSelection(sel: com.xnotes.core.pdf.TextSelection, type: MarkupType, pluginComment: String? = null) {
+        val owner = state.document
+        val pageIdentities = if (pluginComment != null) owner.pages.toList() else null
         val intensity = controller.configFor(Tool.MARKUP).markupIntensity
         val color = controller.inkColor
         readPdfTexts(sel.start.page..sel.end.page) { texts ->
+            if (state.document !== owner || (pluginComment != null &&
+                (owner.pages != pageIdentities || !declarativePlugins.featureEnabled("document.annotation_tools")))) return@readPdfTexts
             pdfText.clear()
             val made = com.xnotes.core.pdf.Markups.of(sel, { texts[it] }, type, color, intensity, System.currentTimeMillis())
+                .mapIndexed { index, pair ->
+                    if (index == 0 && pluginComment != null) pair.first to pair.second.copy(note = pluginComment) else pair
+                }
             val pages = state.document.pages
             val steps = made.groupBy({ it.first }, { it.second })
                 .mapNotNull { (i, marks) -> pages.getOrNull(i)?.let { AddMarkups(it, marks) } }
@@ -1669,6 +1677,7 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
         // Whatever is added while this note records takes the recording's moment.
         history.onPush = { command -> AudioRecording.stamp(this, command.added()) }
         history.onChanged = { change ->
+            if (pluginPanel != null) pluginRevision++
             extensions.historyChanged(com.xnotes.plugins.EditorEvent.Operation.valueOf(change.name))
         }
         controller.onLinkTap = onLinkTap@{ pageIndex, pageLocal ->
@@ -6322,6 +6331,7 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
     }
 
     private fun replaceDocument(doc: Document) {
+        resetPluginPanels()
         dismissScriptMenu()
         dismissPluginExport()
         view.sideButton.reset()
@@ -6368,6 +6378,8 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
         val script = declarativePlugins.scriptFor(action)
         if (script != null) {
             requestScriptMenu(script)
+        } else if (action == "advanced-pdf-annotations:open") {
+            openPluginPanel(action)
         } else if (action == "pen-menu:open") {
             if (!noteOpen) return
             val canvas = if (canvasOpen) infinite else null
@@ -6390,6 +6402,60 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
     internal val declarativePlugins by lazy { com.xnotes.plugins.DeclarativePluginManager.get(appContext) }
 
     internal fun runPluginUiCommand(id: String) { dispatchTapGesture(id) }
+
+    internal var pluginPanel by mutableStateOf<String?>(null)
+        private set
+    private var pluginRevision by mutableStateOf(0L)
+    internal fun closePluginPanel() { pluginPanel = null }
+    private fun openPluginPanel(id: String) {
+        val feature = com.xnotes.plugins.NativeFeature.ADVANCED_ANNOTATIONS
+        if (!noteOpen || canvasOpen || id != feature.command) return
+        declarativePlugins.executeNative(feature, extensions.commands) {
+            pluginPanel = id
+            sidebarVisible = true
+        }
+    }
+
+    internal fun pluginAnnotationRows(): List<com.xnotes.plugins.ExportAnnotation> {
+        @Suppress("UNUSED_VARIABLE") val observed = pluginRevision
+        if (!noteOpen || canvasOpen || !declarativePlugins.featureEnabled("document.annotation_tools")) return emptyList()
+        return com.xnotes.plugins.DocumentReadApi.annotationRows(state.document)
+    }
+
+    internal fun editPluginAnnotation(page: Int, id: String, comment: String?, remove: Boolean = false) {
+        if (!noteOpen || canvasOpen || !declarativePlugins.featureEnabled("document.annotation_tools")) return
+        val target = state.document.pages.getOrNull(page - 1) ?: return
+        val mark = target.markups.firstOrNull { it.id == id } ?: return
+        if (remove) applyMarkupEdit(RemoveMarkup(target, mark))
+        else {
+            val note = comment?.replace("\r\n", "\n")?.take(20000)?.takeIf { it.isNotBlank() }
+            if (note != mark.note) applyMarkupEdit(ReplaceMarkup(target, mark, mark.copy(note = note, modified = System.currentTimeMillis())))
+        }
+    }
+
+    private var pendingPluginSelection: Pair<Document, com.xnotes.core.pdf.TextSelection>? = null
+    internal var pluginCommentOpen by mutableStateOf(false)
+        private set
+    internal fun runPluginSelectionAction(id: String) {
+        if (id != "advanced-pdf-annotations:comment" || !noteOpen || canvasOpen ||
+            !declarativePlugins.featureEnabled("document.annotation_tools")) return
+        val selection = pdfText.selection ?: return
+        pendingPluginSelection = state.document to selection
+        pluginCommentOpen = true
+    }
+    internal fun dismissPluginComment() { pendingPluginSelection = null; pluginCommentOpen = false }
+    internal fun savePluginComment(text: String, type: MarkupType) {
+        val pending = pendingPluginSelection
+        dismissPluginComment()
+        if (pending == null || !noteOpen || canvasOpen || state.document !== pending.first ||
+            !declarativePlugins.featureEnabled("document.annotation_tools") || text.isBlank()) return
+        markSelection(pending.second, type, text.take(20000))
+    }
+
+    private fun resetPluginPanels() {
+        dismissPluginComment()
+        closePluginPanel()
+    }
 
     internal var scriptMenuRequest by mutableStateOf<com.xnotes.plugins.ScriptMenuRequest?>(null)
         private set
@@ -9325,6 +9391,7 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
      *  [noteOpen] so the editor is removed from the stack. The document stays as an inert buffer. */
     fun goHome() {
         if (!noteOpen) return
+        resetPluginPanels()
         dismissScriptMenu()
         dismissPluginExport()
         resetPluginInput()

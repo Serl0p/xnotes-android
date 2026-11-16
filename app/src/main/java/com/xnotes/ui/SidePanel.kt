@@ -112,6 +112,7 @@ fun SidePanel(
 ) {
     val palette = LocalPalette.current
     val tab = editor.sidePanelTab
+    if (PluginSidebar(editor)) return
     var pickingCover by remember { mutableStateOf(false) }
     if (pickingCover) {
         NewNoteScreen(

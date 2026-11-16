@@ -8,6 +8,12 @@ import com.xnotes.core.model.TextItem
 /** Host-only adapter; callers must authorize the feature and resolve the active surface first.
  * Keep model dependencies here, not in formatters or untrusted extension bridges. UI thread only. */
 internal object DocumentReadApi {
+    fun annotationRows(doc: Document): List<ExportAnnotation> =
+        doc.pages.flatMapIndexed { i, page -> page.markups.map { mark ->
+            ExportAnnotation(mark.id, i + 1, page.pdfPage?.plus(1), mark.type.id,
+                Rgba.toHex(mark.color), mark.text, mark.note, mark.created, mark.modified)
+        } }.take(DocumentExports.MAX_ANNOTATIONS)
+
     fun snapshot(doc: Document, feature: NativeFeature): ExportDocument {
         require(feature == NativeFeature.ANNOTATIONS || feature == NativeFeature.OBSIDIAN)
         val typed = "document.text.read" in feature.permissions

@@ -15,7 +15,10 @@ internal enum class NativeFeature(
         "Annotation Exporter", "Read native text annotations and the active note title; copy or export on request."),
     OBSIDIAN("document.obsidian", "obsidian-companion", 3,
         setOf("document.annotations.read", "document.text.read", "document.metadata.read", "storage.export", "commands.register"), "export",
-        "Obsidian Companion", "Read active note metadata, typed text and native annotations; copy or export on request.");
+        "Obsidian Companion", "Read active note metadata, typed text and native annotations; copy or export on request."),
+    ADVANCED_ANNOTATIONS("document.annotation_tools", "advanced-pdf-annotations", 4,
+        setOf("document.annotations.read", "document.annotations.write", "ui.context_menu", "ui.panel", "navigation.page", "commands.register"), "open",
+        "Advanced PDF Annotations", "List and edit native PDF annotations and comments; navigate to their pages.");
 
     val command: String? get() = localCommand?.let { "$owner:$it" }
     companion object {

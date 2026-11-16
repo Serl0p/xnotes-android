@@ -1,5 +1,7 @@
 package com.xnotes.ui
 
+import com.xnotes.plugins.contributions
+
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.background
 import androidx.compose.foundation.ScrollState
@@ -754,10 +756,11 @@ fun PdfSelectionMenu(editor: Editor) {
     val palette = LocalPalette.current
     val density = LocalDensity.current
     val actions = remember { editor.pdfTextActions() }
+    val pluginActions = editor.declarativePlugins.contributions(com.xnotes.plugins.PluginSlot.PDF_SELECTION)
     var overflowOpen by remember { mutableStateOf(false) }
 
     val barHeightPx = with(density) { 48.dp.toPx() }
-    val barWidthPx = with(density) { ((1 + PDF_MARKS.size + if (actions.isEmpty()) 0 else 1) * 46).dp.toPx() }
+    val barWidthPx = with(density) { ((1 + PDF_MARKS.size + if (actions.isEmpty() && pluginActions.isEmpty()) 0 else 1) * 46).dp.toPx() }
     val gap = with(density) { 10.dp.toPx() }
     val margin = with(density) { 8.dp.toPx() }
     // When pushed below the selection, also clear the teardrop handles hanging there.
@@ -783,7 +786,7 @@ fun PdfSelectionMenu(editor: Editor) {
             for ((type, icon, label) in PDF_MARKS) {
                 ActionIcon(icon, stringResource(label)) { editor.markPdfSelection(type) }
             }
-            if (actions.isNotEmpty()) {
+            if (actions.isNotEmpty() || pluginActions.isNotEmpty()) {
                 Box {
                     ActionIcon(XnotesIcons.more, stringResource(R.string.more)) { overflowOpen = true }
                     DropdownMenu(
@@ -791,6 +794,12 @@ fun PdfSelectionMenu(editor: Editor) {
                         onDismissRequest = { overflowOpen = false },
                         properties = PopupProperties(focusable = false),
                     ) {
+                        for (action in pluginActions) {
+                            DropdownMenuItem(text = { Text(action.label) }, onClick = {
+                                overflowOpen = false
+                                editor.runPluginSelectionAction(action.id)
+                            })
+                        }
                         for ((label, app) in actions) {
                             DropdownMenuItem(text = { Text(label) }, onClick = {
                                 overflowOpen = false

@@ -10,9 +10,14 @@ internal fun DeclarativePluginManager.contributions(slot: PluginSlot): List<Plug
         PluginSlot.VIEW_MENU -> buildList {
             for (kind in ExportKind.entries) if (featureEnabled(kind.feature))
                 kind.command?.let { add(PluginContribution(it, kind.label, slot)) }
+            if (featureEnabled(NativeFeature.ADVANCED_ANNOTATIONS.key))
+                add(PluginContribution("advanced-pdf-annotations:open", "Advanced PDF Annotations", slot))
             for (entry in installed) if (entry.enabled && entry.pkg.script != null)
                 add(PluginContribution("${entry.pkg.id}:open", entry.pkg.name, slot))
         }
-        else -> emptyList()
+        PluginSlot.PDF_SELECTION -> if (featureEnabled(NativeFeature.ADVANCED_ANNOTATIONS.key))
+            listOf(PluginContribution("advanced-pdf-annotations:comment", "Add comment to selected text", slot)) else emptyList()
+        PluginSlot.SIDEBAR -> if (featureEnabled(NativeFeature.ADVANCED_ANNOTATIONS.key))
+            listOf(PluginContribution("advanced-pdf-annotations:open", "Annotations", slot)) else emptyList()
     }
 }
