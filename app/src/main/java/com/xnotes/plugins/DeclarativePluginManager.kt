@@ -54,7 +54,7 @@ internal class DeclarativePluginManager private constructor(context: Context) {
 
     fun uninstall(id: String) = save(installed.filterNot { it.pkg.id == id })
 
-    fun setSafeMode(value: Boolean) {
+    fun updateSafeMode(value: Boolean) {
         check(prefs.edit().putBoolean("safe_mode", value).commit()) { "Could not save safe mode" }
         safeMode = value
     }

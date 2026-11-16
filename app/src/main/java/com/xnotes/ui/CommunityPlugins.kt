@@ -80,7 +80,7 @@ internal fun CommunityPlugins(editor: Editor) {
             Text("Safe mode")
             Text("Suspend all plugin commands; keep packages and settings.", fontSize = 12.sp)
         }
-        Switch(checked = manager.safeMode, onCheckedChange = { value -> change { manager.setSafeMode(value) } })
+        Switch(checked = manager.safeMode, onCheckedChange = { value -> change { manager.updateSafeMode(value) } })
     }
     manager.loadError?.let { Text(it, fontSize = 12.sp) }
     if (manager.installed.isEmpty()) Text("No plugins installed.", fontSize = 12.sp)
