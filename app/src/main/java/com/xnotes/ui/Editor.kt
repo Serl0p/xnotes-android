@@ -6356,8 +6356,30 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, S
     /** Run the action a two/three-finger tap or stylus double-tap is mapped to; "none" does nothing. */
     private fun dispatchTapGesture(action: String) {
         // A canvas on top must not edit the paged note underneath it.
-        if (canvasOpen) infinite.dispatchTapGesture(action)
+        if (com.xnotes.plugins.DeclarativePackages.isCommand(action)) {
+            runDeclarativeCommand(action)
+        } else if (canvasOpen) infinite.dispatchTapGesture(action)
         else extensions.commands.execute(action)
+    }
+
+    internal val declarativePlugins by lazy { com.xnotes.plugins.DeclarativePluginManager.get(appContext) }
+
+    /** An explicit profile selection goes through the active surface's native command registry. */
+    internal fun runDeclarativeCommand(id: String): Boolean {
+        val canvas = if (canvasOpen) infinite else null
+        val registry = canvas?.extensions?.commands ?: extensions.commands
+        return declarativePlugins.execute(id, registry) { profile ->
+            val config = profile.config
+            controller.setToolConfig(profile.tool, config.copy(rgba = controller.inkColor))
+            infiniteOrNull?.setToolConfig(profile.tool, config)
+            if (canvas != null) canvas.armTool(profile.tool) else selectTool(profile.tool)
+            settingsDirty = true
+            // Only the primary pane owns persistent drawing defaults, as with native settings.
+            if (pane == Pane.PRIMARY) {
+                settings = settings.copy(tools = settings.tools + (profile.tool to config), lastTool = profile.tool)
+                saveSettingsSoon()
+            }
+        }
     }
 
     /** Arm [target], or if it is already armed, return to the previous tool (no-op if none yet). */

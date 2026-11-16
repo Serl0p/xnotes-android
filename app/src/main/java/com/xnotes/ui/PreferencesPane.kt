@@ -285,7 +285,8 @@ fun PreferencesPane(
                     update(prefs.copy(penButtonHover = it))
                 }
             }
-            val tapOptions = tapGestureOptions.map { (id, res) -> id to stringResource(res) }
+            val tapOptions = tapGestureOptions.map { (id, res) -> id to stringResource(res) } +
+                editor.declarativePlugins.activeCommands()
             FieldLabel(stringResource(R.string.pref_two_finger_tap))
             OptionDropdown(tapOptions, prefs.twoFingerTap) { update(prefs.copy(twoFingerTap = it)) }
             FieldLabel(stringResource(R.string.pref_three_finger_tap))
@@ -548,6 +549,10 @@ fun PreferencesPane(
                     TextButton(onClick = { editor.removeCustomFont(font.face) }) { Text(stringResource(R.string.remove), fontSize = 12.sp) }
                 }
             }
+
+            HorizontalDivider(color = palette.border.toComposeColor())
+            SectionTitle("Community plugins")
+            CommunityPlugins(editor)
 
             HorizontalDivider(color = palette.border.toComposeColor())
             SectionTitle(stringResource(R.string.pref_toolbar))

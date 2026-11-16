@@ -1,0 +1,12 @@
+{
+  "id": "pen-profiles",
+  "name": "Pen Profiles",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "type": "declarative",
+  "description": "Five reusable pen presets for handwriting and annotations.",
+  "permissions": [
+    "tools.configure",
+    "commands.register"
+  ]
+}

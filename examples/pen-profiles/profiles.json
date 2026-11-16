@@ -1,0 +1,45 @@
+{
+  "profiles": [
+    {
+      "id": "lecture",
+      "name": "Lecture notes",
+      "tool": "pen",
+      "width": 2.5,
+      "pressure": true,
+      "minPressure": 0.35
+    },
+    {
+      "id": "logic",
+      "name": "Formal logic",
+      "tool": "pen",
+      "width": 1.5,
+      "color": "#4189DD",
+      "pressure": true,
+      "minPressure": 0.55
+    },
+    {
+      "id": "critical",
+      "name": "Critical annotations",
+      "tool": "pen",
+      "width": 3.5,
+      "color": "#DC505B"
+    },
+    {
+      "id": "headings",
+      "name": "Headings",
+      "tool": "calligraphy",
+      "width": 6,
+      "color": "#9566CA"
+    },
+    {
+      "id": "highlighter",
+      "name": "Neon highlighter",
+      "tool": "highlighter",
+      "width": 16,
+      "color": "#EFC63E",
+      "neon": true,
+      "neonStrength": 0.6,
+      "alpha": 0.45
+    }
+  ]
+}
