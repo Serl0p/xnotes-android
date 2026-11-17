@@ -394,6 +394,20 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, S
         buildPalette(settings.prefs),
     )
     val history = History()
+    /** Per-surface native extensions; actions are executed through the existing editor methods. */
+    internal val extensions by lazy {
+        com.xnotes.plugins.NativeEditorExtensions(
+            schedule = { task -> view.post { task() } },
+            undo = ::undo,
+            redo = ::redo,
+            togglePan = { toggleTool(Tool.PAN) },
+            toggleEraser = { toggleTool(Tool.ERASER) },
+            toggleLasso = { toggleTool(Tool.LASSO) },
+            togglePrevious = ::toggleToPreviousTool,
+            selectPen = { selectTool(Tool.PEN) },
+            onError = { android.util.Log.e("XnotesExtensions", "Editor event listener failed", it) },
+        )
+    }
     val view = CanvasView(context).also { it.state = state }
 
     /** The front buffer wet ink goes into, above [view] and transparent whenever no pen is down. */
@@ -1649,6 +1663,9 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, S
         controller.onUserMovedView = { AudioPlayback.userMoved(this) }
         // Whatever is added while this note records takes the recording's moment.
         history.onPush = { command -> AudioRecording.stamp(this, command.added()) }
+        history.onChanged = { change ->
+            extensions.historyChanged(com.xnotes.plugins.EditorEvent.Operation.valueOf(change.name))
+        }
         controller.onLinkTap = onLinkTap@{ pageIndex, pageLocal ->
             flowLinkAt(pageIndex, pageLocal)?.let {
                 openUrl(it)
@@ -6337,16 +6354,10 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, S
 
 
     /** Run the action a two/three-finger tap or stylus double-tap is mapped to; "none" does nothing. */
-    private fun dispatchTapGesture(action: String) = when {
-        // The pen's taps arrive here whichever surface is up; a canvas on top must not edit the note under it.
-        canvasOpen -> infinite.dispatchTapGesture(action)
-        action == "undo" -> undo()
-        action == "redo" -> redo()
-        action == "toggle_pan" -> toggleTool(Tool.PAN)
-        action == "toggle_eraser" -> toggleTool(Tool.ERASER)
-        action == "toggle_lasso" -> toggleTool(Tool.LASSO)
-        action == "toggle_previous" -> toggleToPreviousTool()
-        else -> Unit
+    private fun dispatchTapGesture(action: String) {
+        // A canvas on top must not edit the paged note underneath it.
+        if (canvasOpen) infinite.dispatchTapGesture(action)
+        else extensions.commands.execute(action)
     }
 
     /** Arm [target], or if it is already armed, return to the previous tool (no-op if none yet). */

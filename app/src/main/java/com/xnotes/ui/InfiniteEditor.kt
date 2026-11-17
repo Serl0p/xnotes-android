@@ -91,6 +91,20 @@ class InfiniteEditor(context: Context) : ToolPopupHost, SelectionMenuHost, LongP
         private set
 
     val history = History()
+    /** Per-surface native extensions; actions are executed through the existing editor methods. */
+    internal val extensions by lazy {
+        com.xnotes.plugins.NativeEditorExtensions(
+            schedule = { task -> view.post { task() } },
+            undo = ::undo,
+            redo = ::redo,
+            togglePan = { toggleTool(Tool.PAN) },
+            toggleEraser = { toggleTool(Tool.ERASER) },
+            toggleLasso = { toggleTool(Tool.LASSO) },
+            togglePrevious = { previousTool?.let { armTool(it) }; Unit },
+            selectPen = { armTool(Tool.PEN) },
+            onError = { android.util.Log.e("XnotesExtensions", "Editor event listener failed", it) },
+        )
+    }
 
     val view = InfiniteCanvasView(appContext)
 
@@ -308,6 +322,9 @@ class InfiniteEditor(context: Context) : ToolPopupHost, SelectionMenuHost, LongP
         document.listener = modelListener
         // Whatever is added while this canvas records takes the recording's moment.
         history.onPush = { command -> AudioRecording.stamp(this, command.added()) }
+        history.onChanged = { change ->
+            extensions.historyChanged(com.xnotes.plugins.EditorEvent.Operation.valueOf(change.name))
+        }
     }
 
     /**
@@ -446,14 +463,7 @@ class InfiniteEditor(context: Context) : ToolPopupHost, SelectionMenuHost, LongP
 
     /** Run the action a finger or stylus tap is mapped to, as the paged editor does. */
     fun dispatchTapGesture(action: String) {
-        when (action) {
-            "undo" -> undo()
-            "redo" -> redo()
-            "toggle_pan" -> toggleTool(Tool.PAN)
-            "toggle_eraser" -> toggleTool(Tool.ERASER)
-            "toggle_lasso" -> toggleTool(Tool.LASSO)
-            "toggle_previous" -> previousTool?.let { armTool(it) }
-        }
+        extensions.commands.execute(action)
     }
 
     /** Arm [target], or if it is already armed, return to the previous tool. */
