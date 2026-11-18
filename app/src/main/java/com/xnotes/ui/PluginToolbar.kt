@@ -51,11 +51,11 @@ internal data class PluginChrome(
 internal val LocalPluginChrome = compositionLocalOf<PluginChrome?> { null }
 
 @Composable
-internal fun rememberPluginChrome(editor: Editor): PluginChrome? {
-    val manager = editor.declarativePlugins
+internal fun rememberPluginChrome(host: PluginToolbarHost): PluginChrome? {
+    val manager = host.manager
     val pkg = manager.toolbarProvider() ?: return null
-    val canvas = editor.canvasOpen
-    val pdf = !canvas && editor.hasPdf
+    val canvas = host.canvas
+    val pdf = !canvas && host.hasPdf
     val settings = manager.scriptSettings(pkg)
     val context = LocalContext.current
     var spec by remember(pkg, canvas, pdf, settings) { mutableStateOf<ToolbarSpec?>(null) }
@@ -74,12 +74,12 @@ internal fun rememberPluginChrome(editor: Editor): PluginChrome? {
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) {
             android.util.Log.w("XnotesExtensions", "Toolbar plugin rejected", e)
-            if (manager.toolbarProvider() === pkg) editor.say("Plugin toolbar unavailable; native toolbar restored")
+            if (manager.toolbarProvider() === pkg) host.report("Plugin toolbar unavailable; native toolbar restored")
         }
     }
     val value = spec ?: return null
     return PluginChrome(value, collapsed && value.collapsible, { collapsed = !collapsed },
-        { id -> if (manager.toolbarProvider() === pkg && manager.activeCommands().any { it.first == id }) editor.runPluginUiCommand(id) },
+        { id -> if (manager.toolbarProvider() === pkg && manager.activeCommands().any { it.first == id }) host.command(id) },
         manager.activeCommands().map { it.first }.toSet())
 }
 

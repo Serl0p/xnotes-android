@@ -1461,7 +1461,7 @@ private fun EditorPane(
         }
     }
     // Plugin chrome is a reversible overlay on native preferences, scoped to this pane.
-    val chrome = com.xnotes.ui.rememberPluginChrome(editor)
+    val chrome = com.xnotes.ui.rememberPluginChrome(remember(editor) { com.xnotes.ui.EditorPluginToolbarAdapter(editor) })
     val nativeLook = com.xnotes.ui.LocalToolbarLook.current
     CompositionLocalProvider(com.xnotes.ui.LocalPluginChrome provides chrome,
         com.xnotes.ui.LocalToolbarLook provides (chrome?.spec?.style?.apply(nativeLook) ?: nativeLook)) {

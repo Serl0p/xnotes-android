@@ -6373,30 +6373,40 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
     }
 
 
-    /** Run the action a two/three-finger tap or stylus double-tap is mapped to; "none" does nothing. */
-    private fun dispatchTapGesture(action: String, at: Pt? = null) {
-        val script = declarativePlugins.scriptFor(action)
-        if (script != null) {
-            requestScriptMenu(script, at)
-        } else if (action == "advanced-pdf-annotations:open") {
-            openPluginPanel(action)
-        } else if (action == "pen-menu:open") {
-            if (!noteOpen) return
-            val canvas = if (canvasOpen) infinite else null
-            val host: PenMenuHost = canvas ?: this
-            val surface: android.view.View = canvas?.view ?: view
-            val registry = canvas?.extensions?.commands ?: extensions.commands
-            declarativePlugins.executePenMenu(registry) {
-                if (host.penMenu.at != null || host.penMenuTool != null) {
-                    host.penMenu.toggle(at ?: Pt(surface.width / 2.0, surface.height / 2.0))
-                }
+    /** Gesture and UI commands enter through one host-owned dispatcher, not separate UI branches. */
+    private val pluginCommandDispatcher by lazy {
+        com.xnotes.plugins.PluginCommandDispatcher(declarativePlugins::scriptFor)
+    }
+    private val pluginCommandPort by lazy {
+        object : com.xnotes.plugins.PluginCommandPort {
+            override fun openScript(pkg: com.xnotes.plugins.DeclarativePackage, at: Pt?) =
+                requestScriptMenu(pkg, at)
+            override fun openAnnotations(id: String) = openPluginPanel(id)
+            override fun openPenMenu(at: Pt?) = openPluginPenMenu(at)
+            override fun requestExport(kind: com.xnotes.plugins.ExportKind) = requestPluginExport(kind)
+            override fun applyDeclarative(id: String) { runDeclarativeCommand(id) }
+            override fun executeNative(id: String) {
+                if (canvasOpen) infinite.dispatchTapGesture(id) else extensions.commands.execute(id)
             }
-        } else if (com.xnotes.plugins.ExportKind.entries.any { it.command == action }) {
-            requestPluginExport(com.xnotes.plugins.ExportKind.entries.first { it.command == action })
-        } else if (com.xnotes.plugins.DeclarativePackages.isCommand(action)) {
-            runDeclarativeCommand(action)
-        } else if (canvasOpen) infinite.dispatchTapGesture(action)
-        else extensions.commands.execute(action)
+        }
+    }
+
+    private fun dispatchTapGesture(action: String, at: Pt? = null) {
+        pluginCommandDispatcher.dispatch(action, at, pluginCommandPort)
+    }
+
+    /** Native pen UI and command grants stay here; plugin routing never receives an Android view. */
+    private fun openPluginPenMenu(at: Pt?) {
+        if (!noteOpen) return
+        val canvas = if (canvasOpen) infinite else null
+        val host: PenMenuHost = canvas ?: this
+        val surface: android.view.View = canvas?.view ?: view
+        val registry = canvas?.extensions?.commands ?: extensions.commands
+        declarativePlugins.executePenMenu(registry) {
+            if (host.penMenu.at != null || host.penMenuTool != null) {
+                host.penMenu.toggle(at ?: Pt(surface.width / 2.0, surface.height / 2.0))
+            }
+        }
     }
 
     internal val declarativePlugins by lazy { com.xnotes.plugins.DeclarativePluginManager.get(appContext) }
@@ -6509,29 +6519,26 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
         }
     }
 
+    /** Thin adapter for host state; gesture timing and listener wiring live outside the editor. */
     private fun bindHoverClicks(
         surface: android.view.View, side: com.xnotes.canvas.SideButtonClicks,
         menu: PenMenuState, isCurrent: () -> Boolean,
     ) {
-        fun active(): Boolean = noteOpen && isCurrent() && surface.isAttachedToWindow &&
-            android.os.Build.MANUFACTURER.equals("samsung", ignoreCase = true) &&
-            declarativePlugins.featureEnabled("stylus.hover")
-        val sequence = com.xnotes.canvas.HoverClickSequence(
-            schedule = { task -> surface.postDelayed(task, declarativePlugins.stylusDoubleMs()) },
-            cancel = { task -> surface.removeCallbacks(task) },
-            deliver = { action, at -> if (active()) dispatchTapGesture(action, at) },
-            windowMs = { declarativePlugins.stylusDoubleMs() },
-            now = { android.os.SystemClock.uptimeMillis() },
+        com.xnotes.plugins.PluginStylusBinding.attach(
+            surface = surface,
+            side = side,
+            active = { noteOpen && isCurrent() && surface.isAttachedToWindow &&
+                android.os.Build.MANUFACTURER.equals("samsung", ignoreCase = true) &&
+                declarativePlugins.featureEnabled("stylus.hover") },
+            clickDelayMs = declarativePlugins::stylusClickMs,
+            doubleDelayMs = declarativePlugins::stylusDoubleMs,
+            singleAction = { preferences.stylusButtonTap },
+            doubleAction = { preferences.stylusDoubleTap },
+            onAction = ::dispatchTapGesture,
+            onTouch = {
+                if (scriptMenuRequest != null) { dismissScriptMenu(); true } else menu.takesTouch()
+            },
         )
-        side.clickTimeoutMs = { if (active()) declarativePlugins.stylusClickMs() else null }
-        side.clicking = { active() && (preferences.stylusButtonTap != "none" || preferences.stylusDoubleTap != "none") }
-        side.onClick = { at ->
-            if (active()) sequence.click(at, preferences.stylusButtonTap, preferences.stylusDoubleTap)
-        }
-        side.onContact = { sequence.reset() }
-        side.touchClosesMenu = {
-            if (scriptMenuRequest != null) { dismissScriptMenu(); true } else menu.takesTouch()
-        }
     }
 
     internal fun cancelPluginClicks() {
