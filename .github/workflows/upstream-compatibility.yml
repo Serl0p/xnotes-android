@@ -1,0 +1,118 @@
+name: Upstream compatibility (experimental)
+
+on:
+  schedule:
+    - cron: '23 10 * * 1'
+  workflow_dispatch:
+    inputs:
+      candidate_ref:
+        description: 'Fork branch to test against upstream/master'
+        required: true
+        default: 'extensions/architecture-refactor'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-compatibility
+  cancel-in-progress: false
+
+jobs:
+  integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      CANDIDATE: ${{ inputs.candidate_ref || 'extensions/architecture-refactor' }}
+    steps:
+      - name: Checkout candidate (full history, no persistent credentials)
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.CANDIDATE }}
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Attempt upstream integration in a disposable local branch
+        id: merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p integration-report
+          git config user.name "xNotes compatibility bot"
+          git config user.email "compatibility@users.noreply.github.com"
+          BASE_SHA="$(git rev-parse HEAD)"
+          echo "Candidate: ${CANDIDATE} (${BASE_SHA})" | tee integration-report/result.txt
+          git fetch --no-tags https://github.com/shardulvs/xnotes-android.git master
+          UPSTREAM_SHA="$(git rev-parse FETCH_HEAD)"
+          echo "Upstream master: ${UPSTREAM_SHA}" | tee -a integration-report/result.txt
+          {
+            echo "candidate_sha=${BASE_SHA}"
+            echo "upstream_sha=${UPSTREAM_SHA}"
+          } >> "${GITHUB_OUTPUT}"
+          git switch -c "compatibility-check-${GITHUB_RUN_ID}"
+          if git merge-base --is-ancestor "${UPSTREAM_SHA}" HEAD; then
+            echo "No new upstream commits. Candidate already contains upstream master." | tee -a integration-report/result.txt
+            echo "changed=false" >> "${GITHUB_OUTPUT}"
+            echo "## Upstream compatibility: already up to date" >> "${GITHUB_STEP_SUMMARY}"
+            cat integration-report/result.txt >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+          echo "changed=true" >> "${GITHUB_OUTPUT}"
+          git log --format='%h %s' --no-merges HEAD.."${UPSTREAM_SHA}" > integration-report/new-upstream-commits.txt
+          git diff --name-only HEAD..."${UPSTREAM_SHA}" > integration-report/upstream-changed-files.txt
+          if ! git merge --no-commit --no-ff "${UPSTREAM_SHA}"; then
+            echo "MERGE CONFLICT: no build attempted; candidate branch was not modified." | tee -a integration-report/result.txt
+            git diff --name-only --diff-filter=U | tee integration-report/conflicting-files.txt
+            git diff --check >> integration-report/result.txt 2>&1 || true
+            echo "## Upstream compatibility: merge conflict" >> "${GITHUB_STEP_SUMMARY}"
+            cat integration-report/result.txt integration-report/conflicting-files.txt >> "${GITHUB_STEP_SUMMARY}"
+            exit 1
+          fi
+          git commit -m "test: temporary upstream integration" >/dev/null
+          echo "Merge succeeded locally; compiling and testing, with no automatic promotion." | tee -a integration-report/result.txt
+          git diff --name-only "${BASE_SHA}" HEAD > integration-report/merged-changed-files.txt
+          echo "## Upstream compatibility: source merge succeeded" >> "${GITHUB_STEP_SUMMARY}"
+          cat integration-report/result.txt >> "${GITHUB_STEP_SUMMARY}"
+
+      - uses: actions/setup-java@v6
+        if: steps.merge.outputs.changed == 'true'
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        if: steps.merge.outputs.changed == 'true'
+      - uses: android-actions/setup-android@v4
+        if: steps.merge.outputs.changed == 'true'
+        with:
+          packages: 'platform-tools'
+      - name: Install Android toolchain
+        if: steps.merge.outputs.changed == 'true'
+        run: sdkmanager "platforms;android-36" "ndk;27.0.12077973" "cmake;3.22.1"
+
+      - name: Unit tests and experimental APK
+        if: steps.merge.outputs.changed == 'true'
+        run: |
+          bash ./gradlew --no-daemon testDebugUnitTest assembleDebug
+          echo "Tests and build passed. Device behavior is NOT verified." | tee -a integration-report/result.txt
+          echo "## Tests and build passed; device validation remains necessary" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload experimental APK (never promoted automatically)
+        if: success() && steps.merge.outputs.changed == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: upstream-compatibility-apk-${{ github.run_id }}
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload integration report and test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: upstream-compatibility-report-${{ github.run_id }}
+          path: |
+            integration-report/
+            app/build/reports/tests/
+          if-no-files-found: ignore
+          retention-days: 60
