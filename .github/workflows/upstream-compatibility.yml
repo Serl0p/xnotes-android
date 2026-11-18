@@ -36,7 +36,7 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
-      - name: Attempt upstream integration in a disposable local branch
+      - name: Attempt upstream integration in disposable local branch
         id: merge
         shell: bash
         run: |
@@ -55,7 +55,7 @@ jobs:
           } >> "${GITHUB_OUTPUT}"
           git switch -c "compatibility-check-${GITHUB_RUN_ID}"
           if git merge-base --is-ancestor "${UPSTREAM_SHA}" HEAD; then
-            echo "No new upstream commits. Candidate already contains upstream master." | tee -a integration-report/result.txt
+            echo "No new upstream commits; candidate already contains upstream master." | tee -a integration-report/result.txt
             echo "changed=false" >> "${GITHUB_OUTPUT}"
             echo "## Upstream compatibility: already up to date" >> "${GITHUB_STEP_SUMMARY}"
             cat integration-report/result.txt >> "${GITHUB_STEP_SUMMARY}"
@@ -66,71 +66,14 @@ jobs:
           git diff --name-only "${MERGE_BASE}" "${BASE_SHA}" | sort > integration-report/fork-changed-files.txt
           git diff --name-only "${MERGE_BASE}" "${UPSTREAM_SHA}" | sort > integration-report/upstream-changed-files.txt
           comm -12 integration-report/fork-changed-files.txt integration-report/upstream-changed-files.txt > integration-report/overlapping-files.txt
-          grep -E '^app/src/main/java/com/xnotes/(ui/(Editor|InfiniteEditor|Toolbar|InfiniteToolbar|ToolbarFrame|PluginToolbar)|EditorActivity|canvas/(CanvasView|StylusButtons)|gl/InfiniteCanvasView|settings/Preferences)\\.kt --format='%h %s' --no-merges HEAD.."${UPSTREAM_SHA}" > integration-report/new-upstream-commits.txt
-          if ! git merge --no-commit --no-ff "${UPSTREAM_SHA}"; then
-            echo "MERGE CONFLICT: no build attempted; candidate branch was not modified." | tee -a integration-report/result.txt
-            git diff --name-only --diff-filter=U | tee integration-report/conflicting-files.txt
-            git diff --check >> integration-report/result.txt 2>&1 || true
-            echo "## Upstream compatibility: merge conflict" >> "${GITHUB_STEP_SUMMARY}"
-            cat integration-report/result.txt integration-report/conflicting-files.txt >> "${GITHUB_STEP_SUMMARY}"
-            exit 1
-          fi
-          git commit -m "test: temporary upstream integration" >/dev/null
-          echo "Merge succeeded locally; compiling and testing, with no automatic promotion." | tee -a integration-report/result.txt
-          git diff --name-only "${BASE_SHA}" HEAD > integration-report/merged-changed-files.txt
-          echo "## Upstream compatibility: source merge succeeded" >> "${GITHUB_STEP_SUMMARY}"
-          cat integration-report/result.txt >> "${GITHUB_STEP_SUMMARY}"
-
-      - uses: actions/setup-java@v6
-        if: steps.merge.outputs.changed == 'true'
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: gradle/actions/setup-gradle@v6
-        if: steps.merge.outputs.changed == 'true'
-      - uses: android-actions/setup-android@v4
-        if: steps.merge.outputs.changed == 'true'
-        with:
-          packages: 'platform-tools'
-      - name: Install Android toolchain
-        if: steps.merge.outputs.changed == 'true'
-        run: sdkmanager "platforms;android-36" "ndk;27.0.12077973" "cmake;3.22.1"
-
-      - name: Unit tests and experimental APK
-        if: steps.merge.outputs.changed == 'true'
-        run: |
-          bash ./gradlew --no-daemon testDebugUnitTest assembleDebug
-          echo "Tests and build passed. Device behavior is NOT verified." | tee -a integration-report/result.txt
-          echo "## Tests and build passed; device validation remains necessary" >> "${GITHUB_STEP_SUMMARY}"
-
-      - name: Upload experimental APK (never promoted automatically)
-        if: success() && steps.merge.outputs.changed == 'true'
-        uses: actions/upload-artifact@v7
-        with:
-          name: upstream-compatibility-apk-${{ github.run_id }}
-          path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload integration report and test results
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: upstream-compatibility-report-${{ github.run_id }}
-          path: |
-            integration-report/
-            app/build/reports/tests/
-          if-no-files-found: ignore
-          retention-days: 60
- integration-report/upstream-changed-files.txt > integration-report/adapter-impact-files.txt || true
+          grep -E '^app/src/main/java/com/xnotes/(ui/(Editor|InfiniteEditor|Toolbar|InfiniteToolbar|ToolbarFrame|PluginToolbar)|EditorActivity|canvas/(CanvasView|StylusButtons)|gl/InfiniteCanvasView|settings/Preferences)\.kt$' integration-report/upstream-changed-files.txt > integration-report/adapter-impact-files.txt || true
+          git log --format='%h %s' --no-merges HEAD.."${UPSTREAM_SHA}" > integration-report/new-upstream-commits.txt
           echo "Potentially overlapping files:" >> integration-report/result.txt
           cat integration-report/overlapping-files.txt >> integration-report/result.txt
           echo "Native integration surfaces changed upstream:" >> integration-report/result.txt
           cat integration-report/adapter-impact-files.txt >> integration-report/result.txt
-          git log --format='%h %s' --no-merges HEAD.."${UPSTREAM_SHA}" > integration-report/new-upstream-commits.txt
-          git diff --name-only HEAD..."${UPSTREAM_SHA}" > integration-report/upstream-changed-files.txt
           if ! git merge --no-commit --no-ff "${UPSTREAM_SHA}"; then
-            echo "MERGE CONFLICT: no build attempted; candidate branch was not modified." | tee -a integration-report/result.txt
+            echo "MERGE CONFLICT: candidate branch was not modified." | tee -a integration-report/result.txt
             git diff --name-only --diff-filter=U | tee integration-report/conflicting-files.txt
             git diff --check >> integration-report/result.txt 2>&1 || true
             echo "## Upstream compatibility: merge conflict" >> "${GITHUB_STEP_SUMMARY}"
@@ -138,7 +81,7 @@ jobs:
             exit 1
           fi
           git commit -m "test: temporary upstream integration" >/dev/null
-          echo "Merge succeeded locally; compiling and testing, with no automatic promotion." | tee -a integration-report/result.txt
+          echo "Merge succeeded locally; building without automatic promotion." | tee -a integration-report/result.txt
           git diff --name-only "${BASE_SHA}" HEAD > integration-report/merged-changed-files.txt
           echo "## Upstream compatibility: source merge succeeded" >> "${GITHUB_STEP_SUMMARY}"
           cat integration-report/result.txt >> "${GITHUB_STEP_SUMMARY}"
@@ -157,15 +100,13 @@ jobs:
       - name: Install Android toolchain
         if: steps.merge.outputs.changed == 'true'
         run: sdkmanager "platforms;android-36" "ndk;27.0.12077973" "cmake;3.22.1"
-
       - name: Unit tests and experimental APK
         if: steps.merge.outputs.changed == 'true'
         run: |
           bash ./gradlew --no-daemon testDebugUnitTest assembleDebug
-          echo "Tests and build passed. Device behavior is NOT verified." | tee -a integration-report/result.txt
-          echo "## Tests and build passed; device validation remains necessary" >> "${GITHUB_STEP_SUMMARY}"
-
-      - name: Upload experimental APK (never promoted automatically)
+          echo "Tests and build passed; device behavior NOT verified." | tee -a integration-report/result.txt
+          echo "## Unit tests and build passed; device testing still required" >> "${GITHUB_STEP_SUMMARY}"
+      - name: Upload experimental APK (never automatically promoted)
         if: success() && steps.merge.outputs.changed == 'true'
         uses: actions/upload-artifact@v7
         with:
@@ -173,8 +114,7 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
-
-      - name: Upload integration report and test results
+      - name: Upload integration report and test reports
         if: always()
         uses: actions/upload-artifact@v7
         with:
