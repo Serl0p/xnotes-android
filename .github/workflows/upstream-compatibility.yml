@@ -11,7 +11,7 @@ on:
       candidate_ref:
         description: 'Fork branch to test against upstream/master'
         required: true
-        default: 'extensions/document-host-refactor'
+        default: 'extensions/startup-hotfix'
         type: string
 
 permissions:
@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     env:
-      CANDIDATE: ${{ inputs.candidate_ref || 'extensions/document-host-refactor' }}
+      CANDIDATE: ${{ inputs.candidate_ref || 'extensions/startup-hotfix' }}
     steps:
       - name: Checkout candidate (full history, no persistent credentials)
         uses: actions/checkout@v7
