@@ -294,6 +294,10 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
 
     private val appContext = context.applicationContext
 
+    // Declare the lazy delegate before init blocks install callbacks that may refer to it.
+    // Referencing a late-declared property during constructor initialization can crash at launch.
+    internal val declarativePlugins by lazy { com.xnotes.plugins.DeclarativePluginManager.get(appContext) }
+
     /** The context the views are built from, kept so a second pane can be built the same way. The
      *  application context will not do: it is not attached to a display, so the cutout probe throws
      *  on it and any View made from it misses the activity's theme. */
@@ -6410,8 +6414,6 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
         }
     }
 
-    internal val declarativePlugins by lazy { com.xnotes.plugins.DeclarativePluginManager.get(appContext) }
-
     internal fun runPluginUiCommand(id: String) { dispatchTapGesture(id) }
 
     /** App-owned document integration. The plugin runtime receives detached values, never a live Document. */
@@ -6487,8 +6489,10 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, P
             active = { noteOpen && isCurrent() && surface.isAttachedToWindow &&
                 android.os.Build.MANUFACTURER.equals("samsung", ignoreCase = true) &&
                 declarativePlugins.featureEnabled("stylus.hover") },
-            clickDelayMs = declarativePlugins::stylusClickMs,
-            doubleDelayMs = declarativePlugins::stylusDoubleMs,
+            // These callbacks must remain deferred: this binding is installed in an init block
+            // before the lazy declarativePlugins property below is initialized.
+            clickDelayMs = { declarativePlugins.stylusClickMs() },
+            doubleDelayMs = { declarativePlugins.stylusDoubleMs() },
             singleAction = { preferences.stylusButtonTap },
             doubleAction = { preferences.stylusDoubleTap },
             onAction = ::dispatchTapGesture,
